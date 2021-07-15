@@ -22,6 +22,7 @@ import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.common.annotation.InterfaceAudience;
 import org.apache.bookkeeper.common.annotation.InterfaceStability;
 import org.apache.bookkeeper.mledger.impl.OpAddEntry;
+import org.apache.bookkeeper.mledger.proto.MLDataFormats;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -55,7 +56,18 @@ public interface ManagedLedgerInterceptor {
     CompletableFuture<Void> onManagedLedgerLastLedgerInitialize(String name, LedgerHandle ledgerHandle);
 
     /**
-     * @param propertiesMap  map of properties.
+     * @param propertiesMap  map of properties for managed ledger.
      */
     void onUpdateManagedLedgerInfo(Map<String, String> propertiesMap);
+
+    /**
+     * @param propertiesMap  map of properties for ledger.
+     * @param isFirstLedger whether the created ledger is the first ledger
+     */
+    void onLedgerCreated(Map<String, String> propertiesMap, boolean isFirstLedger);
+
+    /**
+     * @param ledgerInfo
+     */
+    void onLedgerTrim(MLDataFormats.ManagedLedgerInfo.LedgerInfo ledgerInfo);
 }

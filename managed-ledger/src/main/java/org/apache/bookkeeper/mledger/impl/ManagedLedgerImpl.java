@@ -330,6 +330,16 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
 
                 for (LedgerInfo ls : mlInfo.getLedgerInfoList()) {
                     ledgers.put(ls.getLedgerId(), ls);
+                    if (ls.getLedgerId() == ledgers.firstKey()) {
+                        if (managedLedgerInterceptor != null && ls.getPropertiesCount() > 0) {
+                            Map<String, String> ledgerProperties = Maps.newHashMap();
+                            for (int i = 0; i < ls.getPropertiesCount(); i++) {
+                                MLDataFormats.KeyValue property = ls.getProperties(i);
+                                ledgerProperties.put(property.getKey(), property.getValue());
+                            }
+                            managedLedgerInterceptor.onManagedLedgerPropertiesInitialize(ledgerProperties);
+                        }
+                    }
                 }
 
                 if (mlInfo.getPropertiesCount() > 0) {
@@ -346,6 +356,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                 // Last ledger stat may be zeroed, we must update it
                 if (ledgers.size() > 0) {
                     final long id = ledgers.lastKey();
+                    final LedgerInfo ledgerInfo = ledgers.get(id);
                     OpenCallback opencb = (rc, lh, ctx1) -> {
                         executor.executeOrdered(name, safeRun(() -> {
                             mbean.endDataLedgerOpenOp();
@@ -353,9 +364,13 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                                 log.debug("[{}] Opened ledger {}: {}", name, id, BKException.getMessage(rc));
                             }
                             if (rc == BKException.Code.OK) {
-                                LedgerInfo info = LedgerInfo.newBuilder().setLedgerId(id)
-                                        .setEntries(lh.getLastAddConfirmed() + 1).setSize(lh.getLength())
-                                        .setTimestamp(clock.millis()).build();
+                                LedgerInfo info = LedgerInfo.newBuilder()
+                                        .setLedgerId(id)
+                                        .setEntries(lh.getLastAddConfirmed() + 1)
+                                        .setSize(lh.getLength())
+                                        .setTimestamp(clock.millis())
+                                        .addAllProperties(ledgerInfo.getPropertiesList())
+                                        .build();
                                 ledgers.put(id, info);
                                 if (managedLedgerInterceptor != null) {
                                     managedLedgerInterceptor.onManagedLedgerLastLedgerInitialize(name, lh)
@@ -479,9 +494,8 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                         break;
                     }
                 }
-
-                LedgerInfo info = LedgerInfo.newBuilder().setLedgerId(lh.getId()).setTimestamp(0).build();
-                ledgers.put(lh.getId(), info);
+                LedgerInfo ledgerInfo = buildLedgerInfo(lh.getId(), 0, ledgers.size() == 0);
+                ledgers.put(lh.getId(), ledgerInfo);
 
                 // Save it back to ensure all nodes exist
                 store.asyncUpdateLedgerIds(name, getManagedLedgerInfo(), ledgersStat, storeLedgersCb);
@@ -1405,7 +1419,8 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             lastLedgerCreationFailureTimestamp = clock.millis();
         } else {
             log.info("[{}] Created new ledger {}", name, lh.getId());
-            ledgers.put(lh.getId(), LedgerInfo.newBuilder().setLedgerId(lh.getId()).setTimestamp(0).build());
+            LedgerInfo ledgerInfo = buildLedgerInfo(lh.getId(), 0, ledgers.size() == 0);
+            ledgers.put(lh.getId(), ledgerInfo);
             currentLedger = lh;
             currentLedgerEntries = 0;
             currentLedgerSize = 0;
@@ -1559,8 +1574,13 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             log.debug("[{}] Ledger has been closed id={} entries={}", name, lh.getId(), entriesInLedger);
         }
         if (entriesInLedger > 0) {
-            LedgerInfo info = LedgerInfo.newBuilder().setLedgerId(lh.getId()).setEntries(entriesInLedger)
-                    .setSize(lh.getLength()).setTimestamp(clock.millis()).build();
+            LedgerInfo info = LedgerInfo.newBuilder()
+                    .setLedgerId(lh.getId())
+                    .setEntries(entriesInLedger)
+                    .setSize(lh.getLength())
+                    .setTimestamp(clock.millis())
+                    .addAllProperties(ledgers.get(lh.getId()).getPropertiesList())
+                    .build();
             ledgers.put(lh.getId(), info);
         } else {
             // The last ledger was empty, so we can discard it
@@ -2346,6 +2366,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
 
             long slowestReaderLedgerId = -1;
             if (!cursors.hasDurableCursors()) {
+                log.info("### cursors has not durable cursors");
                 // At this point the lastLedger will be pointing to the
                 // ledger that has just been closed, therefore the +1 to
                 // include lastLedger in the trimming.
@@ -2365,10 +2386,13 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                 log.debug("[{}] Slowest consumer ledger id: {}", name, slowestReaderLedgerId);
             }
 
+
             long totalSizeToDelete = 0;
             boolean retentionSizeQuotaMet = false;
             // skip ledger if retention constraint met
+            log.info("### slowestReadLedgerId is {}, ledgers {}", slowestReaderLedgerId, ledgers);
             for (LedgerInfo ls : ledgers.headMap(slowestReaderLedgerId, false).values()) {
+
                 // currentLedger can not be deleted
                 if (ls.getLedgerId() == currentLedger.getId()) {
                     if (log.isDebugEnabled()) {
@@ -2390,6 +2414,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                 totalSizeToDelete += ls.getSize();
                 boolean overRetentionQuota = isLedgerRetentionOverSizeQuota(totalSizeToDelete);
                 boolean expired = hasLedgerRetentionExpired(ls.getTimestamp());
+                log.info("### retention size & time  {} {}, overRetentionQuota {}, expire {}", config.getRetentionSizeInMB(), config.getRetentionTimeMillis(), overRetentionQuota, expired);
                 if (log.isDebugEnabled()) {
                     log.debug(
                             "[{}] Checking ledger {} -- time-old: {} sec -- "
@@ -2453,6 +2478,13 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                 TOTAL_SIZE_UPDATER.addAndGet(this, -ls.getSize());
 
                 entryCache.invalidateAllEntries(ls.getLedgerId());
+            }
+            if (ledgersToDelete.size() > 0 && managedLedgerInterceptor != null) {
+                long lastLedgerToDelete = ledgersToDelete.get(ledgersToDelete.size() - 1).getLedgerId();
+                Map.Entry<Long, LedgerInfo> ledgerInfoEntry = ledgers.higherEntry(lastLedgerToDelete);
+                if (ledgerInfoEntry != null) {
+                    managedLedgerInterceptor.onLedgerTrim(ledgerInfoEntry.getValue());
+                }
             }
             for (LedgerInfo ls : offloadedLedgersToDelete) {
                 LedgerInfo.Builder newInfoBuilder = ls.toBuilder();
@@ -3431,6 +3463,23 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
         }
 
         return mlInfo.build();
+    }
+
+    private LedgerInfo buildLedgerInfo(long ledgerId, long entries, boolean isFirstLedger) {
+        Map<String, String> ledgerProperties = new HashMap<>();
+        if (managedLedgerInterceptor != null) {
+            managedLedgerInterceptor.onLedgerCreated(ledgerProperties, isFirstLedger);
+        }
+        LedgerInfo.Builder ledgerInfoBuilder = LedgerInfo.newBuilder()
+                .setLedgerId(ledgerId)
+                .setEntries(entries)
+                .setTimestamp(0);
+        for (Map.Entry<String, String> property : ledgerProperties.entrySet()) {
+            ledgerInfoBuilder.addProperties(MLDataFormats.KeyValue.newBuilder()
+                    .setKey(property.getKey()).setValue(property.getValue()));
+        }
+        LedgerInfo ledgerInfo = ledgerInfoBuilder.build();
+        return ledgerInfo;
     }
 
     /**

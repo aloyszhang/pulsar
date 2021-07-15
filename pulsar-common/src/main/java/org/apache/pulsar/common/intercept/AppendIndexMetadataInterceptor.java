@@ -24,15 +24,21 @@ import org.apache.pulsar.common.api.proto.BrokerEntryMetadata;
 
 public class AppendIndexMetadataInterceptor implements BrokerEntryMetadataInterceptor{
     private final AtomicLong indexGenerator;
+    private long startIndex;
 
     public AppendIndexMetadataInterceptor() {
         this.indexGenerator = new AtomicLong(-1);
+        this.startIndex = -1;
     }
 
     public void recoveryIndexGenerator(long index) {
         if (indexGenerator.get() < index) {
             indexGenerator.set(index);
         }
+    }
+
+    public void setStartIndex(long startIndex) {
+       this.startIndex = startIndex;
     }
 
     @Override
@@ -50,5 +56,9 @@ public class AppendIndexMetadataInterceptor implements BrokerEntryMetadataInterc
 
     public long getIndex() {
         return indexGenerator.get();
+    }
+
+    public long getStartIndex() {
+        return startIndex;
     }
 }

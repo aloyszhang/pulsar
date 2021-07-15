@@ -21,6 +21,7 @@ package org.apache.pulsar.transaction.coordinator.impl;
 import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.mledger.impl.OpAddEntry;
 import org.apache.bookkeeper.mledger.intercept.ManagedLedgerInterceptor;
+import org.apache.bookkeeper.mledger.proto.MLDataFormats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,16 @@ public class MLTransactionLogInterceptor implements ManagedLedgerInterceptor {
     @Override
     public void onUpdateManagedLedgerInfo(Map<String, String> propertiesMap) {
         propertiesMap.put(MAX_LOCAL_TXN_ID, maxLocalTxnId + "");
+    }
+
+    @Override
+    public void onLedgerCreated(Map<String, String> propertiesMap,  boolean isFirstLedger) {
+
+    }
+
+    @Override
+    public void onLedgerTrim(MLDataFormats.ManagedLedgerInfo.LedgerInfo ledgerInfo) {
+
     }
 
     protected void setMaxLocalTxnId(long maxLocalTxnId) {

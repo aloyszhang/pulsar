@@ -57,6 +57,8 @@ import org.apache.pulsar.common.protocol.schema.StoredSchema;
 import org.apache.pulsar.common.schema.LongSchemaVersion;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.pulsar.metadata.api.MetadataStoreException.AlreadyExistsException;
+import org.apache.pulsar.metadata.api.MetadataStoreException.BadVersionException;
 
 @Slf4j
 public class SchemaRegistryServiceImpl implements SchemaRegistryService {
@@ -181,56 +183,84 @@ public class SchemaRegistryServiceImpl implements SchemaRegistryService {
     @NotNull
     public CompletableFuture<SchemaVersion> putSchemaIfAbsent(String schemaId, SchemaData schema,
                                                               SchemaCompatibilityStrategy strategy) {
-        return trimDeletedSchemaAndGetList(schemaId).thenCompose(schemaAndMetadataList ->
-                getSchemaVersionBySchemaData(schemaAndMetadataList, schema).thenCompose(schemaVersion -> {
-            if (schemaVersion != null) {
-                if (log.isDebugEnabled()) {
-                    log.debug("[{}] Schema is already exists", schemaId);
-                }
-                return CompletableFuture.completedFuture(schemaVersion);
-            }
-            CompletableFuture<Void> checkCompatibilityFuture = new CompletableFuture<>();
-            if (schemaAndMetadataList.size() != 0) {
-                if (isTransitiveStrategy(strategy)) {
-                    checkCompatibilityFuture =
-                            checkCompatibilityWithAll(schemaId, schema, strategy, schemaAndMetadataList);
-                } else {
-                    checkCompatibilityFuture = checkCompatibilityWithLatest(schemaId, schema, strategy);
-                }
-            } else {
-                checkCompatibilityFuture.complete(null);
-            }
-            return checkCompatibilityFuture.thenCompose(v -> {
-                byte[] context = hashFunction.hashBytes(schema.getData()).asBytes();
-                SchemaRegistryFormat.SchemaInfo info = SchemaRegistryFormat.SchemaInfo.newBuilder()
-                        .setType(Functions.convertFromDomainType(schema.getType()))
-                        .setSchema(ByteString.copyFrom(schema.getData()))
-                        .setSchemaId(schemaId)
-                        .setUser(schema.getUser())
-                        .setDeleted(false)
-                        .setTimestamp(clock.millis())
-                        .addAllProps(toPairs(schema.getProps()))
-                        .build();
+        CompletableFuture<SchemaVersion> persistentFuture = new CompletableFuture<>();
+        return trimDeletedSchemaAndGetList(schemaId)
+                .thenCompose(schemaAndMetadataList ->
+                        getSchemaVersionBySchemaData(schemaAndMetadataList, schema)
+                                .thenCompose(schemaVersion -> {
+                                    if (schemaVersion != null) {
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("[{}] Schema is already exists", schemaId);
+                                        }
+                                        return CompletableFuture.completedFuture(schemaVersion);
+                                    }
+                                    CompletableFuture<Void> checkCompatibilityFuture = new CompletableFuture<>();
+                                    if (schemaAndMetadataList.size() != 0) {
+                                        if (isTransitiveStrategy(strategy)) {
+                                            checkCompatibilityFuture = checkCompatibilityWithAll(schemaId, schema,
+                                                    strategy, schemaAndMetadataList);
+                                        } else {
+                                            checkCompatibilityFuture = checkCompatibilityWithLatest(schemaId,
+                                                    schema, strategy);
+                                        }
+                                    } else {
+                                        checkCompatibilityFuture.complete(null);
+                                    }
+                                    return checkCompatibilityFuture.thenCompose(v -> {
+                                        byte[] context = hashFunction.hashBytes(schema.getData()).asBytes();
+                                        SchemaRegistryFormat.SchemaInfo info = SchemaRegistryFormat.SchemaInfo
+                                                .newBuilder()
+                                                .setType(Functions.convertFromDomainType(schema.getType()))
+                                                .setSchema(ByteString.copyFrom(schema.getData()))
+                                                .setSchemaId(schemaId)
+                                                .setUser(schema.getUser())
+                                                .setDeleted(false)
+                                                .setTimestamp(clock.millis())
+                                                .addAllProps(toPairs(schema.getProps()))
+                                                .build();
 
-                long start = this.clock.millis();
+                                        long start = this.clock.millis();
+                                        schemaStorage
+                                                .put(schemaId, info.toByteArray(), context)
+                                                .thenAccept(sv -> {
+                                                    if (log.isDebugEnabled()) {
+                                                        log.debug("[{}] Schema is successfully added", schemaId);
+                                                    }
+                                                    this.stats.recordPutLatency(schemaId, this.clock.millis() - start);
+                                                    persistentFuture.complete(sv);
+                                                })
+                                                .exceptionally(t -> {
+                                                    if (t != null) {
+                                                        if (t.getCause() instanceof AlreadyExistsException
+                                                                || t.getCause() instanceof BadVersionException) {
+                                                            // retry if put schemaLocator to zk failed caused by race condition
+                                                            if (log.isDebugEnabled()) {
+                                                                log.debug("[{}] Put schema failed because of {}, retry",
+                                                                        t.getCause().getMessage(), schemaId);
+                                                            }
+                                                            putSchemaIfAbsent(schemaId, schema, strategy)
+                                                                    .thenAccept(persistentFuture::complete)
+                                                                    .exceptionally(ex2 -> {
+                                                                        persistentFuture.completeExceptionally(ex2);
+                                                                        return null;
+                                                                    });;
 
-                return schemaStorage
-                        .put(schemaId, info.toByteArray(), context)
-                        .whenComplete((__, t) -> {
-                            if (t != null) {
-                                log.error("[{}] Put schema failed", schemaId);
-                                this.stats.recordPutFailed(schemaId);
-                            } else {
-                                if (log.isDebugEnabled()) {
-                                    log.debug("[{}] Put schema finished", schemaId);
-                                }
-                                this.stats.recordPutLatency(schemaId, this.clock.millis() - start);
-                            }
-                        });
-
-            });
-
-        }));
+                                                        } else {
+                                                            log.error("[{}] Put schema failed", schemaId);
+                                                            this.stats.recordPutFailed(schemaId);
+                                                        }
+                                                    } else {
+                                                        if (log.isDebugEnabled()) {
+                                                            log.debug("[{}] Put schema finished", schemaId);
+                                                        }
+                                                        this.stats.recordPutLatency(schemaId,
+                                                                this.clock.millis() - start);
+                                                    }
+                                                    return null;
+                                                });
+                                        return persistentFuture;
+                                    });
+                                }));
     }
 
     @Override

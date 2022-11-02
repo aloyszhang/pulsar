@@ -23,8 +23,6 @@ import static com.google.protobuf.ByteString.copyFrom;
 import static java.util.Objects.isNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.apache.pulsar.broker.service.schema.BookkeeperSchemaStorage.Functions.newSchemaEntry;
-import static org.apache.pulsar.metadata.api.MetadataStoreException.AlreadyExistsException;
-import static org.apache.pulsar.metadata.api.MetadataStoreException.BadVersionException;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -289,22 +287,8 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
                                     updateSchemaLocator(schemaId, optLocatorEntry.get(), position, hash)
                                             .thenAccept(future::complete)
                                             .exceptionally(ex -> {
-                                                if (ex.getCause() instanceof BadVersionException) {
-                                                    // There was a race condition on the schema creation.
-                                                    // Since it has now been created,
-                                                    // retry the whole operation so that we have a chance to
-                                                    // recover without bubbling error
-                                                    putSchema(schemaId, data, hash)
-                                                            .thenAccept(future::complete)
-                                                            .exceptionally(ex2 -> {
-                                                                future.completeExceptionally(ex2);
-                                                                return null;
-                                                            });
-                                                } else {
-                                            // For other errors, just fail the operation
-                                            future.completeExceptionally(ex);
-                                        }
-                                        return null;
+                                                future.completeExceptionally(ex);
+                                                return null;
                                     });
                             return future;
                         })
@@ -315,21 +299,7 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
                 createNewSchema(schemaId, data, hash)
                         .thenAccept(future::complete)
                         .exceptionally(ex -> {
-                            if (ex.getCause() instanceof AlreadyExistsException
-                                    || ex.getCause() instanceof BadVersionException) {
-                                // There was a race condition on the schema creation. Since it has now been created,
-                                // retry the whole operation so that we have a chance to recover without bubbling error
-                                // back to producer/consumer
-                                putSchema(schemaId, data, hash)
-                                        .thenAccept(future::complete)
-                                        .exceptionally(ex2 -> {
-                                            future.completeExceptionally(ex2);
-                                            return null;
-                                        });
-                            } else {
-                                // For other errors, just fail the operation
-                                future.completeExceptionally(ex);
-                            }
+                            future.completeExceptionally(ex);
                             return null;
                         });
 

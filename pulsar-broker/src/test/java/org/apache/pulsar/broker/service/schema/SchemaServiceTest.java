@@ -155,6 +155,18 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
     }
 
     @Test
+    public void testConcurrentPutSchema() throws Exception {
+        String schemaId = "tenant/ns/topic_test_concurrent_put_schema" + UUID.randomUUID();
+        CompletableFuture.allOf(
+                putSchema(schemaId, schemaData1),
+                putSchema(schemaId, schemaData1),
+                putSchema(schemaId, schemaData1),
+                putSchema(schemaId, schemaData1))
+                .get();
+        assertEquals(getAllSchemas(schemaId).size(), 1);
+    }
+
+    @Test
     public void findSchemaVersionTest() throws Exception {
         putSchema(schemaId1, schemaData1, version(0));
         assertEquals(0, schemaRegistryService.findSchemaVersion(schemaId1, schemaData1).get().longValue());
@@ -317,6 +329,10 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
     public void testSchemaStorageFailed() throws Exception {
         conf.setSchemaRegistryStorageClassName("Unknown class name");
         restartBroker();
+    }
+
+    private CompletableFuture<SchemaVersion> putSchema(String schemaId, SchemaData schema) {
+        return schemaRegistryService.putSchemaIfAbsent(schemaId, schema, SchemaCompatibilityStrategy.FULL);
     }
 
     private void putSchema(String schemaId, SchemaData schema, SchemaVersion expectedVersion) throws Exception {

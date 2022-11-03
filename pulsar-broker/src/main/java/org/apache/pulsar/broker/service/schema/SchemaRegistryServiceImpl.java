@@ -233,7 +233,8 @@ public class SchemaRegistryServiceImpl implements SchemaRegistryService {
                                                     if (t != null) {
                                                         if (t.getCause() instanceof AlreadyExistsException
                                                                 || t.getCause() instanceof BadVersionException) {
-                                                            // retry if put schemaLocator to zk failed caused by race condition
+                                                            // retry if put schemaLocator to zk failed caused by
+                                                            // race condition
                                                             if (log.isDebugEnabled()) {
                                                                 log.debug("[{}] Put schema failed because of {}, retry",
                                                                         t.getCause().getMessage(), schemaId);
@@ -243,7 +244,7 @@ public class SchemaRegistryServiceImpl implements SchemaRegistryService {
                                                                     .exceptionally(ex2 -> {
                                                                         persistentFuture.completeExceptionally(ex2);
                                                                         return null;
-                                                                    });;
+                                                                    });
 
                                                         } else {
                                                             log.error("[{}] Put schema failed", schemaId);

@@ -286,7 +286,6 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
                 );
             } else {
                 // No schema was defined yet
-                CompletableFuture<Long> future = new CompletableFuture<>();
                 return createNewSchema(schemaId, data, hash);
             }
         });

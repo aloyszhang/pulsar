@@ -186,7 +186,7 @@ public class SchemaRegistryServiceImpl implements SchemaRegistryService {
 
         return putSchemaIfAbsent(schemaId, schema, strategy, 0, 0);
     }
-    @Override
+
     @NotNull
     public CompletableFuture<SchemaVersion> putSchemaIfAbsent(String schemaId, SchemaData schema,
             SchemaCompatibilityStrategy strategy, long startTime, int retry) {
@@ -237,7 +237,7 @@ public class SchemaRegistryServiceImpl implements SchemaRegistryService {
                                     if (t.getCause() instanceof AlreadyExistsException
                                             || t.getCause() instanceof BadVersionException) {
                                         // retry if put schemaLocator to zk failed caused by race condition
-                                        int retryTime = retry > 0 ? retry : 1;
+                                        int retryTime = retry > 0 ? retry + 1 : 1;
                                         if (log.isDebugEnabled()) {
                                             log.debug("[{}] Put schema failed because of {}, retry {} times",
                                                     t.getCause().getMessage(), schemaId, retryTime);

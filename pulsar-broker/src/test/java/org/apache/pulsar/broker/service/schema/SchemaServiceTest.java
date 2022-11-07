@@ -110,6 +110,11 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
         getSchema(schemaId, version(0));
         deleteSchema(schemaId, version(1));
 
+        // simulate race condition of writing zookeeper
+        putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+        putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+        putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrometheusMetricsGenerator.generate(pulsar, false, false, false, output);
         output.flush();
@@ -122,6 +127,13 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
         Assert.assertEquals(getMetrics.size(), 0);
         Collection<PrometheusMetricsTest.Metric> putMetrics = metrics.get("pulsar_schema_put_ops_failed_total");
         Assert.assertEquals(putMetrics.size(), 0);
+
+        Collection<PrometheusMetricsTest.Metric> retryMetrics = metrics.get("pulsar_schema_put_ops_retry_total");
+        Assert.assertTrue(retryMetrics.size() > 0);
+        PrometheusMetricsTest.Metric retryMetric = retryMetrics.iterator().next();
+        Assert.assertEquals(retryMetric.tags.get("namespace"), namespace);
+        Assert.assertEquals(retryMetric.value, 2.0);
+
 
         Collection<PrometheusMetricsTest.Metric> deleteLatency = metrics.get("pulsar_schema_del_ops_latency_count");
         for (PrometheusMetricsTest.Metric metric : deleteLatency) {
@@ -345,6 +357,11 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
                 schemaId, schema, strategy);
         SchemaVersion newVersion = put.get();
         assertEquals(expectedVersion, newVersion);
+    }
+
+    private void putSchemaAsync(String schemaId, SchemaData schema, SchemaVersion expectedVersion,
+            SchemaCompatibilityStrategy strategy) {
+        schemaRegistryService.putSchemaIfAbsent(schemaId, schema, strategy);
     }
 
     private SchemaData getLatestSchema(String schemaId, SchemaVersion expectedVersion) throws Exception {

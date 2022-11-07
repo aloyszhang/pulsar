@@ -111,9 +111,11 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
         deleteSchema(schemaId, version(1));
 
         // simulate race condition of writing zookeeper
-        putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
-        putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
-        putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+        for (int i = 0;  i < 3; i++) {
+            new Thread(() -> {
+                putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+            }).start();
+        }
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrometheusMetricsGenerator.generate(pulsar, false, false, false, output);

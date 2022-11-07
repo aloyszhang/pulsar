@@ -36,6 +36,7 @@ class SchemaRegistryStats implements AutoCloseable, Runnable {
 
     private final Counter getOpsFailedCounter;
     private final Counter putOpsFailedCounter;
+    private final Counter putOpsRetryCounter;
     private final Counter deleteOpsFailedCounter;
 
     private final Counter compatibleCounter;
@@ -64,6 +65,9 @@ class SchemaRegistryStats implements AutoCloseable, Runnable {
         this.getOpsFailedCounter = Counter.build("pulsar_schema_get_ops_failed_total", "-")
                 .labelNames(NAMESPACE).create().register();
         this.putOpsFailedCounter = Counter.build("pulsar_schema_put_ops_failed_total", "-")
+                .labelNames(NAMESPACE).create().register();
+
+        this.putOpsRetryCounter = Counter.build("pulsar_schema_put_ops_retry_total", "-")
                 .labelNames(NAMESPACE).create().register();
 
         this.compatibleCounter = Counter.build("pulsar_schema_compatible_total", "-")
@@ -102,6 +106,9 @@ class SchemaRegistryStats implements AutoCloseable, Runnable {
         this.putOpsFailedCounter.labels(getNamespace(schemaId)).inc();
     }
 
+    void recordPutRetry(String schemaId) {
+        this.putOpsRetryCounter.labels(getNamespace(schemaId)).inc();
+    }
     void recordDelLatency(String schemaId, long millis) {
         this.deleteOpsLatency.labels(getNamespace(schemaId)).observe(millis);
     }
@@ -139,6 +146,7 @@ class SchemaRegistryStats implements AutoCloseable, Runnable {
     private void removeChild(String namespace) {
         getOpsFailedCounter.remove(namespace);
         putOpsFailedCounter.remove(namespace);
+        putOpsRetryCounter.remove(namespace);
         deleteOpsFailedCounter.remove(namespace);
         compatibleCounter.remove(namespace);
         incompatibleCounter.remove(namespace);
@@ -153,6 +161,7 @@ class SchemaRegistryStats implements AutoCloseable, Runnable {
             CollectorRegistry.defaultRegistry.unregister(this.deleteOpsFailedCounter);
             CollectorRegistry.defaultRegistry.unregister(this.getOpsFailedCounter);
             CollectorRegistry.defaultRegistry.unregister(this.putOpsFailedCounter);
+            CollectorRegistry.defaultRegistry.unregister(this.putOpsRetryCounter);
             CollectorRegistry.defaultRegistry.unregister(this.compatibleCounter);
             CollectorRegistry.defaultRegistry.unregister(this.incompatibleCounter);
             CollectorRegistry.defaultRegistry.unregister(this.deleteOpsLatency);

@@ -49,6 +49,12 @@ public class DefaultSchemaRegistryService implements SchemaRegistryService {
     }
 
     @Override
+    public CompletableFuture<SchemaVersion> putSchemaIfAbsent(String schemaId, SchemaData schema,
+            SchemaCompatibilityStrategy strategy, long startTime, int retry) {
+        return completedFuture(null);
+    }
+
+    @Override
     public CompletableFuture<List<SchemaAndMetadata>> trimDeletedSchemaAndGetList(String schemaId) {
         return completedFuture(Collections.emptyList());
     }

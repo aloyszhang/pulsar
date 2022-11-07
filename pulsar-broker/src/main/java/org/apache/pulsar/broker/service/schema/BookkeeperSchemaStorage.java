@@ -282,28 +282,12 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
                 return readSchemaEntry(locator.getIndexList().get(0).getPosition())
                         .thenCompose(schemaEntry -> addNewSchemaEntryToStore(schemaId,
                                 locator.getIndexList(), data).thenCompose(
-                                position -> {
-                                    CompletableFuture<Long> future = new CompletableFuture<>();
-                                    updateSchemaLocator(schemaId, optLocatorEntry.get(), position, hash)
-                                            .thenAccept(future::complete)
-                                            .exceptionally(ex -> {
-                                                future.completeExceptionally(ex);
-                                                return null;
-                                    });
-                            return future;
-                        })
+                                position -> updateSchemaLocator(schemaId, optLocatorEntry.get(), position, hash))
                 );
             } else {
                 // No schema was defined yet
                 CompletableFuture<Long> future = new CompletableFuture<>();
-                createNewSchema(schemaId, data, hash)
-                        .thenAccept(future::complete)
-                        .exceptionally(ex -> {
-                            future.completeExceptionally(ex);
-                            return null;
-                        });
-
-                return future;
+                return createNewSchema(schemaId, data, hash);
             }
         });
     }

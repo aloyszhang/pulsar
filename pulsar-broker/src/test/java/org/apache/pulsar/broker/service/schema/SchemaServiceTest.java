@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutionException;
 import com.google.common.collect.Multimap;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
+import java.util.concurrent.TimeUnit;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest;
 import org.apache.pulsar.broker.service.schema.SchemaRegistry.SchemaAndMetadata;
@@ -111,11 +112,11 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
         deleteSchema(schemaId, version(1));
 
         // simulate race condition of writing zookeeper
-        for (int i = 0;  i < 3; i++) {
-            new Thread(() -> {
-                putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
-            }).start();
-        }
+        CompletableFuture<SchemaVersion> f1 = putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+        CompletableFuture<SchemaVersion> f2 = putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+        CompletableFuture<SchemaVersion> f3 = putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+
+        CompletableFuture.allOf(f1, f2, f3).get(30, TimeUnit.SECONDS);
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrometheusMetricsGenerator.generate(pulsar, false, false, false, output);
@@ -361,9 +362,9 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
         assertEquals(expectedVersion, newVersion);
     }
 
-    private void putSchemaAsync(String schemaId, SchemaData schema, SchemaVersion expectedVersion,
+    private CompletableFuture<SchemaVersion> putSchemaAsync(String schemaId, SchemaData schema, SchemaVersion expectedVersion,
             SchemaCompatibilityStrategy strategy) {
-        schemaRegistryService.putSchemaIfAbsent(schemaId, schema, strategy);
+        return schemaRegistryService.putSchemaIfAbsent(schemaId, schema, strategy);
     }
 
     private SchemaData getLatestSchema(String schemaId, SchemaVersion expectedVersion) throws Exception {

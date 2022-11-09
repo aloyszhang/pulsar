@@ -35,7 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import com.google.common.collect.Multimap;
 import com.google.common.hash.HashFunction;
@@ -52,6 +54,7 @@ import org.apache.pulsar.common.protocol.schema.SchemaData;
 import org.apache.pulsar.common.schema.LongSchemaVersion;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.common.protocol.schema.SchemaVersion;
+import org.awaitility.Awaitility;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -110,13 +113,43 @@ public class SchemaServiceTest extends MockedPulsarServiceBaseTest {
         putSchema(schemaId, schemaData1, version(0));
         getSchema(schemaId, version(0));
         deleteSchema(schemaId, version(1));
-
+        CyclicBarrier barrier = new CyclicBarrier(3);
+        List<CompletableFuture<SchemaVersion>> futures = new ArrayList<>();
         // simulate race condition of writing zookeeper
-        CompletableFuture<SchemaVersion> f1 = putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
-        CompletableFuture<SchemaVersion> f2 = putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
-        CompletableFuture<SchemaVersion> f3 = putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL);
+        Thread thread1 = new Thread(() -> {
+            try {
+                barrier.await();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            futures.add(putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL));
+        });
 
-        CompletableFuture.allOf(f1, f2, f3).get(30, TimeUnit.SECONDS);
+        Thread thread2 = new Thread(() -> {
+            try {
+                barrier.await();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            futures.add(putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL));
+        });
+
+        Thread thread3 = new Thread(() -> {
+            try {
+                barrier.await();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            futures.add(putSchemaAsync("tenant/ns/retry", schemaData1, version(0), SchemaCompatibilityStrategy.FULL));
+        });
+        thread1.start();
+        thread2.start();
+        thread3.start();
+
+        Awaitility.await().untilAsserted(() -> {
+            assertEquals(3, futures.size());
+            futures.forEach(future -> assertTrue(future.isDone()));
+        });
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrometheusMetricsGenerator.generate(pulsar, false, false, false, output);

@@ -23,12 +23,20 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NavigableMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import lombok.Cleanup;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.LedgerInfo;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
@@ -137,5 +145,42 @@ public class MessageTTLTest extends BrokerTestBase {
         topicPolicies.setMessageTTLInSeconds(5);
         topicRefMock.onUpdate(topicPolicies);
         verify(topicRefMock, times(2)).checkMessageExpiry();
+    }
+
+    @Test
+    public void testTTLOnNoRecoverableException() throws Exception {
+        cleanup();
+        conf.setManagedLedgerMinLedgerRolloverTimeMinutes(0);
+        conf.setManagedLedgerMaxEntriesPerLedger(10);
+        conf.setAutoSkipNonRecoverableData(true);
+        setup();
+        final String namespace = "prop/ns-abc";
+        final String topicName = "persistent://" + namespace + "/testTTLOnNoRecoverableException";
+
+        admin.topics().createNonPartitionedTopic(topicName);
+        admin.topics().setMessageTTL(topicName, 1);
+
+        pulsarClient.newConsumer()
+                .topic(topicName)
+                .subscriptionName("testTTLOnNoRecoverableException-sub")
+                .subscribe();
+        @Cleanup
+        Producer<byte[]> producer = pulsarClient.newProducer().topic(topicName).enableBatching(false).create();
+        for (int i = 0; i < 35; i++) {
+            producer.send(("message-" + i).getBytes());
+        }
+
+        assertTrue(pulsar.getBrokerService().getTopic(topicName, false).get().isPresent());
+        PersistentTopic persistentTopic =
+                (PersistentTopic) pulsar.getBrokerService().getTopic(topicName, false).get().get();
+        NavigableMap<Long, LedgerInfo> ledgers =
+                ((ManagedLedgerImpl) persistentTopic.getManagedLedger()).getLedgersInfo();
+        assertEquals(ledgers.size(), 4);
+        ((ManagedLedgerImpl) persistentTopic.getManagedLedger()).getBookKeeper().deleteLedger(ledgers.firstKey());
+        ((ManagedLedgerImpl) persistentTopic.getManagedLedger()).invalidateReadHandle(ledgers.firstKey());
+        persistentTopic.checkMessageExpiry();
+        Position newMarkDeletePosition = persistentTopic
+                .getSubscription("testTTLOnNoRecoverableException-sub").getCursor().getMarkDeletedPosition();
+        assertTrue(newMarkDeletePosition.getLedgerId() > ledgers.firstKey());
     }
 }

@@ -54,6 +54,7 @@ import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.CloseCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteCursorCallback;
+import org.apache.bookkeeper.mledger.AsyncCallbacks.MarkDeleteCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OffloadCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenCursorCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.TerminateCallback;
@@ -67,6 +68,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException.ManagedLedgerAlready
 import org.apache.bookkeeper.mledger.ManagedLedgerException.ManagedLedgerFencedException;
 import org.apache.bookkeeper.mledger.ManagedLedgerException.ManagedLedgerTerminatedException;
 import org.apache.bookkeeper.mledger.ManagedLedgerException.MetadataNotFoundException;
+import org.apache.bookkeeper.mledger.ManagedLedgerException.NonRecoverableLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorImpl;
@@ -2853,7 +2855,41 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                         (int) (messageTTLInSeconds * MESSAGE_EXPIRY_THRESHOLD), entryTimestamp);
             }
         } catch (Exception e) {
-            log.warn("[{}] Error while getting the oldest message", topic, e);
+            if (brokerService.pulsar().getConfiguration().isAutoSkipNonRecoverableData()
+                    && e instanceof NonRecoverableLedgerException) {
+                // try to find next valid position
+                Position nextMarkDeletePosition;
+                if (e instanceof ManagedLedgerException.LedgerNotExistException) {
+                    // move mark delete to next ledger if current ledger is not exist
+                    nextMarkDeletePosition = ((ManagedCursorImpl) cursor).getNextLedgerPosition(
+                            cursor.getMarkDeletedPosition().getLedgerId());
+                } else {
+                    // move mark delete to next entry if current entry is not exist
+                    nextMarkDeletePosition = ((ManagedLedgerImpl)ledger).getNextValidPosition(
+                            new PositionImpl(cursor.getMarkDeletedPosition().getLedgerId(),
+                                    cursor.getMarkDeletedPosition().getEntryId()));
+                }
+                if (nextMarkDeletePosition != null) {
+                    cursor.asyncMarkDelete(nextMarkDeletePosition, cursor.getProperties(), new MarkDeleteCallback() {
+                        @Override
+                        public void markDeleteComplete(Object ctx) {
+                            log.info("[{}] Successfully skip non recoverable data for {} at position {}",
+                                    ledger.getName(), cursor.getName(), nextMarkDeletePosition);
+                        }
+
+                        @Override
+                        public void markDeleteFailed(ManagedLedgerException exception, Object ctx) {
+                            log.error("[{}] Failed to skip non recoverable data for {} at position {}",
+                                    ledger.getName(), cursor.getName(), nextMarkDeletePosition, exception);
+                        }
+                    }, null);
+                } else {
+                    log.error("[{}] Failed to skip non recoverable data for {} due to next valid position is null",
+                            ledger.getName(), cursor.getName(), e);
+                }
+            } else {
+                log.warn("[{}] Error while getting the oldest message", topic, e);
+            }
         } finally {
             if (entry != null) {
                 entry.release();

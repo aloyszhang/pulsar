@@ -1947,7 +1947,8 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
         });
     }
 
-    void invalidateReadHandle(long ledgerId) {
+    @VisibleForTesting
+    public void invalidateReadHandle(long ledgerId) {
         CompletableFuture<ReadHandle> rhf = ledgerCache.remove(ledgerId);
         if (rhf != null) {
             rhf.thenAccept(ReadHandle::closeAsync)
@@ -4404,5 +4405,10 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             }
         }
         return theSlowestNonDurableReadPosition;
+    }
+
+    @VisibleForTesting
+    public BookKeeper getBookKeeper() {
+        return bookKeeper;
     }
 }

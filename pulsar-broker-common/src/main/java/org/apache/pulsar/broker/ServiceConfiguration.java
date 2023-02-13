@@ -3349,4 +3349,8 @@ public class ServiceConfiguration implements PulsarConfiguration {
                                    MIN_ML_CACHE_EVICTION_FREQUENCY))
                 : Math.min(MAX_ML_CACHE_EVICTION_INTERVAL_MS, managedLedgerCacheEvictionIntervalMs);
     }
+
+    public boolean isSystemTopicAndTopicLevelPoliciesEnabled() {
+        return topicLevelPoliciesEnabled && systemTopicEnabled;
+    }
 }

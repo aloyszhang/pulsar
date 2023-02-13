@@ -3369,8 +3369,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
     }
 
     protected CompletableFuture<Void> initTopicPolicy() {
-        if (brokerService.pulsar().getConfig().isSystemTopicEnabled()
-                && brokerService.pulsar().getConfig().isTopicLevelPoliciesEnabled()) {
+        if (brokerService.pulsar().getConfig().isSystemTopicAndTopicLevelPoliciesEnabled()) {
             return CompletableFuture.completedFuture(null).thenRunAsync(() -> onUpdate(
                             brokerService.getPulsar().getTopicPoliciesService()
                                     .getTopicPoliciesIfExists(TopicName.getPartitionedTopicName(topic))),

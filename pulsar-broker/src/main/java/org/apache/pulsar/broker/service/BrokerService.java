@@ -1701,7 +1701,7 @@ public class BrokerService implements Closeable {
                     RetentionPolicies retentionPolicies = null;
                     OffloadPoliciesImpl topicLevelOffloadPolicies = null;
 
-                    if (pulsar.getConfig().isTopicLevelPoliciesEnabled()
+                    if (pulsar.getConfig().isSystemTopicAndTopicLevelPoliciesEnabled()
                             && !NamespaceService.isSystemServiceNamespace(namespace.toString())) {
                         final TopicPolicies topicPolicies = pulsar.getTopicPoliciesService()
                                 .getTopicPoliciesIfExists(topicName);
@@ -3323,7 +3323,7 @@ public class BrokerService implements Closeable {
      * @return TopicPolicies, if they exist. Otherwise, the value will not be present.
      */
     public Optional<TopicPolicies> getTopicPolicies(TopicName topicName) {
-        if (!pulsar().getConfig().isTopicLevelPoliciesEnabled()) {
+        if (!pulsar().getConfig().isSystemTopicAndTopicLevelPoliciesEnabled()) {
             return Optional.empty();
         }
         return Optional.ofNullable(pulsar.getTopicPoliciesService()
@@ -3332,7 +3332,7 @@ public class BrokerService implements Closeable {
 
     public CompletableFuture<Void> deleteTopicPolicies(TopicName topicName) {
         final PulsarService pulsarService = pulsar();
-        if (!pulsarService.getConfig().isTopicLevelPoliciesEnabled()) {
+        if (!pulsarService.getConfig().isSystemTopicAndTopicLevelPoliciesEnabled()) {
             return CompletableFuture.completedFuture(null);
         }
         return pulsar.getTopicPoliciesService()

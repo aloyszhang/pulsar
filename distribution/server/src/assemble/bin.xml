@@ -121,6 +121,12 @@
       <destName>example-stateful-function-config.yaml</destName>
       <outputDirectory>examples</outputDirectory>
     </file>
+    <file>
+      <source>${basedir}/../../inlong-metrics/target/inlong-metrics-${project.version}.nar</source>
+      <destName>inlong-metrics-interceptor-${project.version}.nar</destName>
+      <outputDirectory>../../interceptors</outputDirectory>
+      <fileMode>644</fileMode>
+    </file>
   </files>
   <dependencySets>
     <dependencySet>

@@ -21,6 +21,7 @@ package org.apache.pulsar.broker.intercept;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
@@ -130,6 +131,14 @@ public class BrokerInterceptorWithClassLoader implements BrokerInterceptor {
     }
 
     @Override
+    public void messagePersistent(ServerCnx cnx, Producer producer, long startTimeNs, long ledgerId, long entryId,
+                                  Topic.PublishContext publishContext) {
+        try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
+            this.interceptor.messagePersistent(cnx, producer, startTimeNs, ledgerId, entryId, publishContext);
+        }
+    }
+
+    @Override
     public  void messageDispatched(ServerCnx cnx, Consumer consumer, long ledgerId,
                                    long entryId, ByteBuf headersAndPayload) {
         try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
@@ -188,6 +197,34 @@ public class BrokerInterceptorWithClassLoader implements BrokerInterceptor {
             throws IOException, ServletException {
         try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
             this.interceptor.onWebserviceResponse(request, response);
+        }
+    }
+
+    @Override
+    public void onInLongMetricsReportTargetsModify(List<String> metricsDestinations) {
+        try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
+            this.interceptor.onInLongMetricsReportTargetsModify(metricsDestinations);
+        }
+    }
+
+    @Override
+    public void onInLongMetricsMaxMetricsCacheSizeModify(long maxMetricsCacheSize) {
+        try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
+            this.interceptor.onInLongMetricsMaxMetricsCacheSizeModify(maxMetricsCacheSize);
+        }
+    }
+
+    @Override
+    public void onInLongMetricsCacheFlushTimeoutModify(long metricsCacheFlushTimeout) {
+        try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
+            this.interceptor.onInLongMetricsCacheFlushTimeoutModify(metricsCacheFlushTimeout);
+        }
+    }
+
+    @Override
+    public void onInLongConsumeMetricsRecordTypeModify(boolean recordMetricsWhenSendToConsume) {
+        try (ClassLoaderSwitcher ignored = new ClassLoaderSwitcher(classLoader)) {
+            this.interceptor.onInLongConsumeMetricsRecordTypeModify(recordMetricsWhenSendToConsume);
         }
     }
 

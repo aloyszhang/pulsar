@@ -278,9 +278,14 @@ public abstract class AbstractBaseDispatcher extends EntryFilterSupport implemen
 
             BrokerInterceptor interceptor = subscription.interceptor();
             if (null != interceptor) {
-                // keep for compatibility if users has implemented the old interface
-                interceptor.beforeSendMessage(subscription, entry, ackSet, msgMetadata);
-                interceptor.beforeSendMessage(subscription, entry, ackSet, msgMetadata, consumer);
+                try {
+                    // keep for compatibility if users has implemented the old interface
+                    interceptor.beforeSendMessage(subscription, entry, ackSet, msgMetadata);
+                    interceptor.beforeSendMessage(subscription, entry, ackSet, msgMetadata, consumer);
+                } catch (Throwable t) {
+                    log.warn("[{}] Failed to intercept beforeSendMessage for subscription {}",
+                            subscription.getTopicName(), subscription, t);
+                }
             }
         }
         if (CollectionUtils.isNotEmpty(entriesToFiltered)) {

@@ -26,6 +26,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.pulsar.common.naming.SystemTopicNames.isTransactionInternalName;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Queues;
+import com.google.common.collect.Sets;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.AdaptiveRecvByteBufAllocator;
@@ -2775,6 +2776,93 @@ public class BrokerService implements Closeable {
 
         // (4) update ServiceConfiguration value by reading zk-configuration-map and trigger corresponding listeners.
         handleDynamicConfigurationUpdates();
+
+        // inlong metrics dynamic configurations
+        registerConfigurationListener("metricsDestinations",
+                (metricsDestinations) -> {
+                    updateInlongMetricsReportTargets();
+                });
+
+        // inlong metrics dynamic configurations
+        registerConfigurationListener("maxMetricsCacheSize",
+                (maxMetricsCacheSize) -> {
+                    updateInlongMetricsMaxMetricsCacheSize();
+                });
+
+        // inlong metrics dynamic configurations
+        registerConfigurationListener("metricsCacheFlushTimeout",
+                (metricsCacheFlushTimeout) -> {
+                    updateInlongMetricsCacheFlushTimeout();
+                });
+
+        // inlong metrics dynamic configurations
+        registerConfigurationListener("recordMetricsWhenSendMessageToConsumer",
+                (recordMetricsWhenSendMessageToConsumer) -> {
+                    updateInlongConsumMetricsRecordType();
+                });
+    }
+
+    public static final Set<String> INLONG_METRICS_REPORT_TARGETS = Sets.newHashSet("inlong", "inlong-metrics");
+    // set 1GB as upper limit
+    private static final long INLONG_METRIC_CACHE_SIZE_UPPER_BOUND = 1073741824L;
+    private void updateInlongMetricsReportTargets() {
+        if (interceptor != null) {
+            List<String> metricReportTargets = pulsar().getConfiguration().getMetricsDestinations();
+            if (metricReportTargets == null || metricReportTargets.isEmpty()) {
+                log.warn("[InLongMetricsConfiguration] "
+                        + "metricsDestinations is empty, will not change current report targets.");
+                return;
+            }
+            log.info("[InLongMetricsConfiguration] metricsDestinations is changed to {}", metricReportTargets);
+            interceptor.onInLongMetricsReportTargetsModify(metricReportTargets);
+        } else {
+            log.warn("[InLongMetricsConfiguration] interceptor is null");
+        }
+
+    }
+
+    private void updateInlongMetricsMaxMetricsCacheSize() {
+        if (interceptor != null) {
+            long maxMetricsCacheSize = pulsar.getConfiguration().getMaxMetricsCacheSize();
+            if (maxMetricsCacheSize <= 0 || maxMetricsCacheSize > INLONG_METRIC_CACHE_SIZE_UPPER_BOUND) {
+                log.warn("[InLongMetricsConfiguration] maxMetricsCacheSize is invalid, maxMetricsCacheSize should be in"
+                        + " range of 0(no included) to {}", INLONG_METRIC_CACHE_SIZE_UPPER_BOUND);
+                return;
+            }
+            log.info("[InLongMetricsConfiguration] maxMetricsCacheSize is changed to {}", maxMetricsCacheSize);
+            interceptor.onInLongMetricsMaxMetricsCacheSizeModify(maxMetricsCacheSize);
+        } else {
+            log.warn("[InLongMetricsConfiguration] interceptor is null");
+        }
+    }
+
+    private void updateInlongMetricsCacheFlushTimeout() {
+        if (interceptor != null) {
+            long metricsCacheFlushTimeout = pulsar.getConfiguration().getMetricsCacheFlushTimeout();
+            long metricsReportInterval = pulsar.getConfiguration().getMetricsReportInterval();
+            if (metricsCacheFlushTimeout <= 0 || metricsCacheFlushTimeout > metricsReportInterval) {
+                log.warn("[InLongMetricsConfiguration] metricsCacheFlushTimeout is invalid, metricsCacheFlushTimeout"
+                        + " should be in range of 0(no included) to metricsReportInterval: {}.", metricsReportInterval);
+                return;
+            }
+            log.info("[InLongMetricsConfiguration] metricsCacheFlushTimeout is changed to {}", metricsCacheFlushTimeout);
+            interceptor.onInLongMetricsCacheFlushTimeoutModify(metricsCacheFlushTimeout);
+        } else {
+            log.warn("[InLongMetricsConfiguration] interceptor is null");
+        }
+
+    }
+
+    private void updateInlongConsumMetricsRecordType() {
+        if (interceptor != null) {
+            boolean recordMetricsWhenSendToConsume =
+                    pulsar.getConfiguration().isRecordMetricsWhenSendMessageToConsumer();
+            log.info("[InLongMetricsConfiguration] updateInlongConsumMetricsRecord recordMetricsWhenSendToConsume: {}",
+                    recordMetricsWhenSendToConsume);
+            interceptor.onInLongConsumeMetricsRecordTypeModify(recordMetricsWhenSendToConsume);
+        } else {
+            log.warn("[InLongMetricsConfiguration] interceptor is null");
+        }
     }
 
     private void updateDefaultNumPartitions(int numPartitions) {

@@ -20,6 +20,7 @@ package org.apache.pulsar.broker.intercept;
 
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -155,6 +156,17 @@ public interface BrokerInterceptor extends AutoCloseable {
     }
 
     /**
+     * Intercept after a message is persistent to bookie successfully.
+     *
+     * @param cnx client Connection
+     * @param producer Producer object
+     * @param publishContext Publish Context
+     */
+    default void messagePersistent(ServerCnx cnx, Producer producer, long startTimeNs, long ledgerId,
+                                   long entryId, Topic.PublishContext publishContext) {
+    }
+
+    /**
      * Intercept after a message is dispatched to consumer.
      *
      * @param cnx client Connection
@@ -222,6 +234,32 @@ public interface BrokerInterceptor extends AutoCloseable {
             throws IOException, ServletException {
         // Just continue the chain by default.
         chain.doFilter(request, response);
+    }
+
+
+    /**
+     * The interception of inglong metrics destinations(ServiceConfiguration#metricsDestinations) modification.
+     */
+    default void onInLongMetricsReportTargetsModify(List<String> metricsDestinations) {
+        // do nothing by default
+    }
+
+    /**
+     * The interception of inglong metrics max cache size(ServiceConfiguration#maxMetricsCacheSize) modification.
+     */
+    default void onInLongMetricsMaxMetricsCacheSizeModify(long maxMetricsCacheSize) {
+        // do nothing by default
+    }
+
+    /**
+     * The interception of inglong metrics flush timeout (ServiceConfiguration#metricsCacheFlushTimeout) modification.
+     */
+    default void onInLongMetricsCacheFlushTimeoutModify(long metricsCacheFlushTimeout) {
+        // do nothing by default
+    }
+
+    default void onInLongConsumeMetricsRecordTypeModify(boolean recordMetricsWhenSendToConsume) {
+        // do nothing by defaultm
     }
 
     /**

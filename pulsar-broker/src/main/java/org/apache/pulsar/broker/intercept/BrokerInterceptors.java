@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
@@ -190,6 +191,16 @@ public class BrokerInterceptors implements BrokerInterceptor {
     }
 
     @Override
+    public void messagePersistent(ServerCnx cnx, Producer producer, long startTimeNs, long ledgerId, long entryId,
+                                  Topic.PublishContext publishContext) {
+        if (interceptorsEnabled()) {
+            for (BrokerInterceptorWithClassLoader value : interceptors.values()) {
+                value.messagePersistent(cnx, producer, startTimeNs, ledgerId, entryId, publishContext);
+            }
+        }
+    }
+
+    @Override
     public  void messageDispatched(ServerCnx cnx, Consumer consumer, long ledgerId,
                                    long entryId, ByteBuf headersAndPayload) {
         if (interceptorsEnabled()) {
@@ -263,6 +274,42 @@ public class BrokerInterceptors implements BrokerInterceptor {
             throws IOException, ServletException {
         for (BrokerInterceptorWithClassLoader value : interceptors.values()) {
             value.onWebserviceResponse(request, response);
+        }
+    }
+
+    @Override
+    public void onInLongMetricsReportTargetsModify(List<String> metricsDestinations) {
+        if (interceptorsEnabled()) {
+            for (BrokerInterceptorWithClassLoader value : interceptors.values()) {
+                value.onInLongMetricsReportTargetsModify(metricsDestinations);
+            }
+        }
+    }
+
+    @Override
+    public void onInLongMetricsMaxMetricsCacheSizeModify(long maxMetricsCacheSize) {
+        if (interceptorsEnabled()) {
+            for (BrokerInterceptorWithClassLoader value : interceptors.values()) {
+                value.onInLongMetricsMaxMetricsCacheSizeModify(maxMetricsCacheSize);
+            }
+        }
+    }
+
+    @Override
+    public void onInLongMetricsCacheFlushTimeoutModify(long metricsCacheFlushTimeout) {
+        if (interceptorsEnabled()) {
+            for (BrokerInterceptorWithClassLoader value : interceptors.values()) {
+                value.onInLongMetricsCacheFlushTimeoutModify(metricsCacheFlushTimeout);
+            }
+        }
+    }
+
+    @Override
+    public void onInLongConsumeMetricsRecordTypeModify(boolean recordMetricsWhenSendToConsume) {
+        if (interceptorsEnabled()) {
+            for (BrokerInterceptorWithClassLoader value : interceptors.values()) {
+                value.onInLongConsumeMetricsRecordTypeModify(recordMetricsWhenSendToConsume);
+            }
         }
     }
 

@@ -3359,6 +3359,86 @@ public class ServiceConfiguration implements PulsarConfiguration {
         return subscriptionKeySharedEnable && subscriptionTypesEnabled.contains("Key_Shared");
     }
 
+    /**** --- InLong metrics related configurations start. --- ****/
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            dynamic = true,
+            doc = "Metrics destinations, including local_file and ngcp"
+    )
+    private List<String> metricsDestinations = Lists.newArrayList("local_file");
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            dynamic = true,
+            doc = "Whether to record consumer metrics at the point of send message to consumer instead of ack"
+    )
+    private boolean recordMetricsWhenSendMessageToConsumer = false;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            dynamic = true,
+            doc = "Metrics cache size for both local file and ngcp, default is 512MB"
+    )
+    private long maxMetricsCacheSize = 536870912;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            dynamic = true,
+            doc = "Metrics report timeout, default is 50 seconds"
+    )
+    private long metricsCacheFlushTimeout = 50000;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "Metrics report interval, default is 60 seconds"
+    )
+    private long metricsReportInterval = 60;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "Metrics report interval, default is 10 seconds"
+    )
+    private long metricsReportInitialDelay = 10;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "Bus sdk is local visit"
+    )
+    private boolean isLocalVisit = true;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "TDM ip"
+    )
+    private String tdManagerIp;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "TDM port"
+    )
+    private int tdManagerPort = 8099;
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "Bid for ngcp topic"
+    )
+    private String ngcpTopicBid = "b_teg_ngcp";
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "Tid for ngcp topic"
+    )
+    private String ngcpTopicTid = "tdbank_pulsar_metric";
+
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            doc = "Metrics send timeout in seconds"
+    )
+    private long ngcpSendTimeout = 10;
+
+    /**** ---  InLong metrics related configurations end. --- ****/
+
     public String getMetadataStoreUrl() {
         if (StringUtils.isNotBlank(metadataStoreUrl)) {
             return metadataStoreUrl;

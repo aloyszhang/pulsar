@@ -275,10 +275,15 @@ public class Producer {
         MessagePublishContext messagePublishContext =
                 MessagePublishContext.get(this, sequenceId, msgIn, headersAndPayload.readableBytes(),
                         batchSize, isChunked, System.nanoTime(), isMarker, position);
-        if (brokerInterceptor != null) {
-            brokerInterceptor
-                    .onMessagePublish(this, headersAndPayload, messagePublishContext);
+        try {
+            if (brokerInterceptor != null) {
+                brokerInterceptor
+                        .onMessagePublish(this, headersAndPayload, messagePublishContext);
+            }
+        } catch (Throwable t) {
+            log.error("Error in interceptor while publishing message", t);
         }
+
         topic.publishMessage(headersAndPayload, messagePublishContext);
     }
 
@@ -287,10 +292,15 @@ public class Producer {
         MessagePublishContext messagePublishContext = MessagePublishContext.get(this, lowestSequenceId,
                 highestSequenceId, msgIn, headersAndPayload.readableBytes(), batchSize,
                 isChunked, System.nanoTime(), isMarker, position);
-        if (brokerInterceptor != null) {
-            brokerInterceptor
-                    .onMessagePublish(this, headersAndPayload, messagePublishContext);
+        try {
+            if (brokerInterceptor != null) {
+                brokerInterceptor
+                        .onMessagePublish(this, headersAndPayload, messagePublishContext);
+            }
+        } catch (Throwable t) {
+            log.error("Error in interceptor while publishing message", t);
         }
+
         topic.publishMessage(headersAndPayload, messagePublishContext);
     }
 
@@ -508,6 +518,17 @@ public class Producer {
                             producer.producerName, producer.producerId, producer.cnx.clientAddress(), sequenceId);
                 }
 
+                // if persistent to bookie success, record persistent metrics for InLong
+                try {
+                    if (producer.brokerInterceptor != null) {
+                        producer.brokerInterceptor.messagePersistent(
+                                (ServerCnx) producer.cnx, producer, startTimeNs, ledgerId, entryId, this);
+                    }
+                } catch (Throwable t) {
+                    log.error("Failed to record message persistent metrics", t);
+                }
+
+
                 this.ledgerId = ledgerId;
                 this.entryId = entryId;
                 producer.cnx.execute(this);
@@ -549,6 +570,14 @@ public class Producer {
             if (producer.brokerInterceptor != null) {
                 producer.brokerInterceptor.messageProduced(
                         (ServerCnx) producer.cnx, producer, startTimeNs, ledgerId, entryId, this);
+            }
+            try {
+                if (producer.brokerInterceptor != null) {
+                    producer.brokerInterceptor.messageProduced(
+                            (ServerCnx) producer.cnx, producer, startTimeNs, ledgerId, entryId, this);
+                }
+            } catch (Throwable t) {
+                log.warn("Error in messageProduced interceptor", t);
             }
             recycle();
         }
@@ -816,10 +845,15 @@ public class Producer {
         MessagePublishContext messagePublishContext =
                 MessagePublishContext.get(this, sequenceId, highSequenceId, msgIn,
                         headersAndPayload.readableBytes(), batchSize, isChunked, System.nanoTime(), isMarker, null);
-        if (brokerInterceptor != null) {
-            brokerInterceptor
-                    .onMessagePublish(this, headersAndPayload, messagePublishContext);
+        try {
+            if (brokerInterceptor != null) {
+                brokerInterceptor
+                        .onMessagePublish(this, headersAndPayload, messagePublishContext);
+            }
+        } catch (Throwable t) {
+            log.error("Error in interceptor while publishing message", t);
         }
+
         topic.publishTxnMessage(txnID, headersAndPayload, messagePublishContext);
     }
 

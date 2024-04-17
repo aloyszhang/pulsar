@@ -60,28 +60,43 @@ Configuration:
 
     # Rolling file appender configuration
     RollingFile:
-      name: RollingFile
-      fileName: "${sys:pulsar.log.dir}/${sys:pulsar.log.file}"
-      filePattern: "${sys:pulsar.log.dir}/${sys:pulsar.log.file}-%d{MM-dd-yyyy}-%i.log.gz"
-      immediateFlush: ${sys:pulsar.log.immediateFlush}
-      PatternLayout:
-        Pattern: "%d{ISO8601_OFFSET_DATE_TIME_HHMM} [%t] %-5level %logger{36} - %msg%n"
-      Policies:
-        TimeBasedTriggeringPolicy:
-          interval: 1
-          modulate: true
-        SizeBasedTriggeringPolicy:
-          size: 1 GB
-      # Delete file older than 30days
-      DefaultRolloverStrategy:
+      - name: RollingFile
+        fileName: "${sys:pulsar.log.dir}/${sys:pulsar.log.file}"
+        filePattern: "${sys:pulsar.log.dir}/${sys:pulsar.log.file}-%d{MM-dd-yyyy}-%i.log.gz"
+        immediateFlush: true
+        PatternLayout:
+          Pattern: "%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg{nolookups}%n"
+        Policies:
+          TimeBasedTriggeringPolicy:
+            interval: 1
+            modulate: true
+          SizeBasedTriggeringPolicy:
+            size: 1 GB
+        # Delete file older than 30days
+        DefaultRolloverStrategy:
           Delete:
             basePath: ${sys:pulsar.log.dir}
             maxDepth: 2
             IfFileName:
-              glob: "${sys:pulsar.log.file}*log.gz"
+              glob: "*/${sys:pulsar.log.file}*log.gz"
             IfLastModified:
-              age: 30d
+              age: 10d
 
+      # index file
+      - name: IndexFile
+        fileName: "${sys:pulsar.log.dir}/pulsar_index.log"
+        filePattern: "${sys:pulsar.log.dir}/pulsar_index-%d{yyyy-MM-dd}-%i.log"
+        immediateFlush: true
+        PatternLayout:
+          Pattern: "%d{yyyy-MM-dd HH:mm:ss,SSS} %m%n"
+        Policies:
+          TimeBasedTriggeringPolicy:
+            interval: 1
+            modulate: true
+          SizeBasedTriggeringPolicy:
+            size: 1 GB
+        DefaultRolloverStrategy:
+          max: 10
     Prometheus:
       name: Prometheus
 

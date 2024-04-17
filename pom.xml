@@ -2281,7 +2281,7 @@ flexible messaging model and an intuitive client API.</description>
         <module>pulsar-broker-auth-sasl</module>
         <module>pulsar-client-auth-sasl</module>
         <module>pulsar-config-validation</module>
-
+        <module>inlong-metrics</module>
         <module>structured-event-log</module>
 
         <!-- transaction related modules -->

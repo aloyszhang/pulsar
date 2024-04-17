@@ -377,7 +377,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                 try {
                     consumer.close();
                     if (brokerInterceptor != null) {
-                        brokerInterceptor.consumerClosed(this, consumer, consumer.getMetadata());
+                        try {
+                            brokerInterceptor.consumerClosed(this, consumer, consumer.getMetadata());
+                        } catch (Throwable t) {
+                            log.warn("[{}] Error when intercept to consumerClosed", remoteAddress, t);
+                        }
                     }
                 } catch (BrokerServiceException e) {
                     log.warn("Consumer {} was already closed: {}", consumer, e);
@@ -2052,7 +2056,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             commandSender.sendSuccessResponse(requestId);
             log.info("[{}] Closed consumer, consumerId={}", remoteAddress, consumerId);
             if (brokerInterceptor != null) {
-                brokerInterceptor.consumerClosed(this, consumer, consumer.getMetadata());
+                try {
+                    brokerInterceptor.consumerClosed(this, consumer, consumer.getMetadata());
+                } catch (Throwable t) {
+                    log.warn("[{}] Error when intercept to consumerClosed", remoteAddress, t);
+                }
             }
         } catch (BrokerServiceException e) {
             log.warn("[{]] Error closing consumer {} : {}", remoteAddress, consumer, e);

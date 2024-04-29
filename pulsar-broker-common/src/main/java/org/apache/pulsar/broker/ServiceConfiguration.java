@@ -843,7 +843,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
                     + "the default is false, which means it is not enabled. "
                     + "When there are a large number of share or key share consumers in the cluster, "
                     + "it can be enabled to reduce the memory consumption caused by pendingAcks.")
-    private boolean autoShrinkForConsumerPendingAcksMap = false;
+    private boolean autoShrinkForConsumerPendingAcksMap = true;
 
     @FieldContext(
         category = CATEGORY_SERVER,

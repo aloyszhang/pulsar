@@ -2847,6 +2847,12 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private boolean exposeConsumerLevelMetricsInPrometheus = false;
     @FieldContext(
             category = CATEGORY_METRICS,
+            dynamic = true,
+            doc = "If true, export subscription level metrics"
+    )
+    private boolean exposeSubscriptionLevelMetricsInPrometheus = true;
+    @FieldContext(
+            category = CATEGORY_METRICS,
             doc = "If true, export producer level metrics otherwise namespace level"
     )
     private boolean exposeProducerLevelMetricsInPrometheus = false;

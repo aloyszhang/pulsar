@@ -492,6 +492,29 @@ public class ServiceConfiguration implements PulsarConfiguration {
     )
     private boolean skipBrokerShutdownOnOOM = false;
 
+
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            dynamic = true,
+            doc = "The minimum receive buffer size for AdaptiveRecvByteBufAllocator"
+    )
+    private int minReceiveByteBuf = 1024;
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            dynamic = true,
+            doc = "The init receive buffer size for AdaptiveRecvByteBufAllocator"
+    )
+    private int initReceiveByteBuf = 16 * 1024;
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            dynamic = true,
+            doc = "The max receive buffer size for AdaptiveRecvByteBufAllocator"
+    )
+    private int maxReceiveByteBuf = 1 * 1024 * 1024;
+
     @FieldContext(
             category = CATEGORY_SERVER,
             doc = "Amount of seconds to timeout when loading a topic. In situations with many geo-replicated clusters, "

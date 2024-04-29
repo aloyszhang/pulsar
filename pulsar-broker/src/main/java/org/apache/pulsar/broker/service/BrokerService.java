@@ -459,7 +459,9 @@ public class BrokerService implements Closeable {
             bootstrap.childOption(ChannelOption.ALLOCATOR, PulsarByteBufAllocator.DEFAULT);
             bootstrap.childOption(ChannelOption.TCP_NODELAY, true);
             bootstrap.childOption(ChannelOption.RCVBUF_ALLOCATOR,
-                    new AdaptiveRecvByteBufAllocator(1024, 16 * 1024, 1 * 1024 * 1024));
+                    new AdaptiveRecvByteBufAllocator(pulsar().getConfig().getMinReceiveByteBuf(),
+                            pulsar().getConfig().getInitReceiveByteBuf(),
+                            pulsar().getConfig().getMaxReceiveByteBuf()));
             EventLoopUtil.enableTriggeredMode(bootstrap);
             DefaultThreadFactory defaultThreadFactory =
                     new ExecutorProvider.ExtendedThreadFactory("pulsar-ph-" + protocol);

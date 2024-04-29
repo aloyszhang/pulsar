@@ -1196,6 +1196,10 @@ public abstract class ConsumerBase<T> extends HandlerState implements Consumer<T
 
     protected void resetIncomingMessageSize() {
         long oldSize = INCOMING_MESSAGES_SIZE_UPDATER.getAndSet(this, 0);
+        if (oldSize < 0) {
+            log.warn("[{}][{}]Incoming message size from INCOMING_MESSAGES_SIZE_UPDATER is negative: {}",
+                    topic, subscription, oldSize);
+        }
         if (GlobalBufferSizeSemaphore.getInstance() != null && oldSize > 0) {
             GlobalBufferSizeSemaphore.getInstance().release(oldSize);
         }

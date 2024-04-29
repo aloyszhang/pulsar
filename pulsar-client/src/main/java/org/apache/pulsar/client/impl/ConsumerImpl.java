@@ -1404,6 +1404,10 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
                             schema, redeliveryCount, consumerEpoch);
             uncompressedPayload.release();
 
+            if (GlobalBufferSizeSemaphore.getInstance() != null) {
+                GlobalBufferSizeSemaphore.getInstance().acquire(message.size());
+            }
+
             if (deadLetterPolicy != null && possibleSendToDeadLetterTopicMessages != null) {
                 if (redeliveryCount >= deadLetterPolicy.getMaxRedeliverCount()) {
                     possibleSendToDeadLetterTopicMessages.put((MessageIdImpl) message.getMessageId(),
@@ -1664,6 +1668,9 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
                 if (acknowledgmentsGroupingTracker.isDuplicate(message.getMessageId())) {
                     skippedMessages++;
                     continue;
+                }
+                if (GlobalBufferSizeSemaphore.getInstance() != null) {
+                    GlobalBufferSizeSemaphore.getInstance().acquire(message.size());
                 }
                 executeNotifyCallback(message);
             }

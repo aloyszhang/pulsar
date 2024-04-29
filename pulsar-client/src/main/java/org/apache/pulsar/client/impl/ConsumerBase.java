@@ -892,11 +892,6 @@ public abstract class ConsumerBase<T> extends HandlerState implements Consumer<T
 
     protected boolean enqueueMessageAndCheckBatchReceive(Message<T> message) {
         int messageSize = message.size();
-
-        if (GlobalBufferSizeSemaphore.getInstance() != null) {
-            GlobalBufferSizeSemaphore.getInstance().acquire(messageSize);
-        }
-
         // synchronize redeliverUnacknowledgedMessages().
         incomingQueueLock.lock();
         try {
@@ -1201,6 +1196,9 @@ public abstract class ConsumerBase<T> extends HandlerState implements Consumer<T
 
     protected void resetIncomingMessageSize() {
         long oldSize = INCOMING_MESSAGES_SIZE_UPDATER.getAndSet(this, 0);
+        if (GlobalBufferSizeSemaphore.getInstance() != null && oldSize > 0) {
+            GlobalBufferSizeSemaphore.getInstance().release(oldSize);
+        }
         getMemoryLimitController().ifPresent(limiter -> limiter.releaseMemory(oldSize));
     }
 

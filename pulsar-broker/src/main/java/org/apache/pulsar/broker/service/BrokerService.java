@@ -259,8 +259,8 @@ public class BrokerService implements Closeable {
     public static final String MANAGED_LEDGER_PATH_ZNODE = "/managed-ledgers";
 
     private static final LongAdder totalUnackedMessages = new LongAdder();
-    private final int maxUnackedMessages;
-    public final int maxUnackedMsgsPerDispatcher;
+    public int maxUnackedMessages;
+    public double maxUnackedMsgsPerDispatcher;
     private static final AtomicBoolean blockedDispatcherOnHighUnackedMsgs = new AtomicBoolean(false);
     private final ConcurrentOpenHashSet<PersistentDispatcherMultipleConsumers> blockedDispatchers;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
@@ -2771,6 +2771,18 @@ public class BrokerService implements Closeable {
             pulsar.getWebService().updateHttpRequestsFailOnUnknownPropertiesEnabled((boolean) enabled);
         });
 
+        // maxUnackedMessagesPerBroker dynamic configurations
+        registerConfigurationListener("maxUnackedMessagesPerBroker",
+                (recordMetricsWhenSendMessageToConsumer) -> {
+                    updateMaxUnackedMessagesPerBroker();
+                });
+
+        // maxUnackedMessagesPerSubscriptionOnBrokerBlocked dynamic configurations
+        registerConfigurationListener("maxUnackedMessagesPerSubscriptionOnBrokerBlocked",
+                (recordMetricsWhenSendMessageToConsumer) -> {
+                    updateMaxUnackedMessagesPerSubscriptionOnBrokerBlocked();
+                });
+
         // add more listeners here
 
         // (3) create dynamic-config if not exist.
@@ -2802,6 +2814,34 @@ public class BrokerService implements Closeable {
                 (recordMetricsWhenSendMessageToConsumer) -> {
                     updateInlongConsumMetricsRecordType();
                 });
+    }
+
+    private void updateMaxUnackedMessagesPerBroker() {
+        int maxUnackedMessagesPerBroker = pulsar.getConfiguration().getMaxUnackedMessagesPerBroker();
+        maxUnackedMessages = maxUnackedMessagesPerBroker;
+        if (maxUnackedMessages  > 0) {
+            maxUnackedMsgsPerDispatcher = maxUnackedMessages
+                    * pulsar.getConfiguration().getMaxUnackedMessagesPerSubscriptionOnBrokerBlocked() / 100;
+        }
+        log.info("Update maxUnackedMessagesPerBroker to {}, maxUnackedMsgsPerDispatcher to {}",
+                maxUnackedMessages, maxUnackedMsgsPerDispatcher);
+    }
+
+    private void updateMaxUnackedMessagesPerSubscriptionOnBrokerBlocked() {
+        double maxUnackedMessagesPercentPerSubscriptionOnBrokerBlocked =
+                pulsar.getConfiguration().getMaxUnackedMessagesPerSubscriptionOnBrokerBlocked();
+        if (maxUnackedMessagesPercentPerSubscriptionOnBrokerBlocked <= 0) {
+            log.warn("maxUnackedMessagesPerSubscriptionOnBrokerBlocked should >= 0, but got {}, ignore",
+                    maxUnackedMessagesPercentPerSubscriptionOnBrokerBlocked);
+            return;
+        } else {
+            if (maxUnackedMessages > 0) {
+                maxUnackedMsgsPerDispatcher = maxUnackedMessages
+                        * maxUnackedMessagesPercentPerSubscriptionOnBrokerBlocked;
+            }
+        }
+        log.info("Update maxUnackedMessagesPerBroker to {}, maxUnackedMsgsPerDispatcher to {}",
+                maxUnackedMessages, maxUnackedMsgsPerDispatcher);
     }
 
     public static final Set<String> INLONG_METRICS_REPORT_TARGETS = Sets.newHashSet("inlong", "inlong-metrics");

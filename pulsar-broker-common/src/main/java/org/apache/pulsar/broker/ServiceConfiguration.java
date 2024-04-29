@@ -898,6 +898,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private int maxUnackedMessagesPerSubscription = 4 * 50000;
     @FieldContext(
         category = CATEGORY_POLICIES,
+        dynamic = true,
         doc = "Max number of unacknowledged messages allowed per broker. \n\n"
             + " Once this limit reaches, broker will stop dispatching messages to all shared subscription "
             + " which has higher number of unack messages until subscriptions start acknowledging messages "
@@ -906,6 +907,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private int maxUnackedMessagesPerBroker = 0;
     @FieldContext(
         category = CATEGORY_POLICIES,
+        dynamic = true,
         doc = "Once broker reaches maxUnackedMessagesPerBroker limit, it blocks subscriptions which has higher "
             + " unacked messages than this percentage limit and subscription will not receive any new messages "
             + " until that subscription acks back `limit/2` messages")

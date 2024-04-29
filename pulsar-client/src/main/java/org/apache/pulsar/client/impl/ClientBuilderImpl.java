@@ -79,6 +79,11 @@ public class ClientBuilderImpl implements ClientBuilder {
         return this;
     }
 
+    public ClientBuilder tickDuration(long tickDuration) {
+        conf.setTickDuration(tickDuration);
+        return this;
+    }
+
     @Override
     public ClientBuilder serviceUrl(String serviceUrl) {
         checkArgument(StringUtils.isNotBlank(serviceUrl), "Param serviceUrl must not be blank.");

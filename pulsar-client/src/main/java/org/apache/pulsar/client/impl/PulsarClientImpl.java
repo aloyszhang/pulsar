@@ -208,7 +208,8 @@ public class PulsarClientImpl implements PulsarClient {
                         conf.isUseTls(), this.scheduledExecutorProvider.getExecutor());
             }
             if (timer == null) {
-                this.timer = new HashedWheelTimer(getThreadFactory("pulsar-timer"), 1, TimeUnit.MILLISECONDS);
+                this.timer = new HashedWheelTimer(getThreadFactory("pulsar-timer"), conf.getTickDuration(),
+                        TimeUnit.MILLISECONDS);
                 needStopTimer = true;
             } else {
                 this.timer = timer;

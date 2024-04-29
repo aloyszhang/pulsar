@@ -337,6 +337,8 @@ public class ClientConfigurationData implements Serializable, Cloneable {
     )
     private ProxyProtocol proxyProtocol;
 
+    long tickDuration = 1;
+
     @ApiModelProperty(
             name = "enableTransaction",
             value = "Whether to enable transaction."

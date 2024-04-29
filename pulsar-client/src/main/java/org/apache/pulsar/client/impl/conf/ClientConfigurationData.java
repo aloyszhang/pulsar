@@ -347,6 +347,8 @@ public class ClientConfigurationData implements Serializable, Cloneable {
 
     private int socketAddressQuarantineTimeSeconds = -1;
 
+    private boolean useNoopDnsResolver = false;
+
     @JsonIgnore
     private Clock clock = Clock.systemDefaultZone();
 

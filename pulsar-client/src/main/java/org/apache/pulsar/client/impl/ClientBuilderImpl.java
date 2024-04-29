@@ -445,4 +445,10 @@ public class ClientBuilderImpl implements ClientBuilder {
         conf.setSocketAddressQuarantineTimeSeconds(seconds);
         return this;
     }
+
+    @Override
+    public ClientBuilder useNoopDnsResolver(boolean useNoopDns) {
+        conf.setUseNoopDnsResolver(useNoopDns);
+        return this;
+    }
 }

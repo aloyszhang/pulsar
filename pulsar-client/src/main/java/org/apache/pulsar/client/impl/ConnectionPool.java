@@ -52,6 +52,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.PulsarClientException.InvalidServiceURL;
 import org.apache.pulsar.client.impl.conf.ClientConfigurationData;
+import org.apache.pulsar.client.impl.noop.NoopAddressResolverGroup;
 import org.apache.pulsar.common.allocator.PulsarByteBufAllocator;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.netty.DnsResolverUtil;
@@ -149,18 +150,22 @@ public class ConnectionPool implements AutoCloseable {
 
     private static AddressResolver<InetSocketAddress> createAddressResolver(ClientConfigurationData conf,
                                                                             EventLoopGroup eventLoopGroup) {
-        DnsNameResolverBuilder dnsNameResolverBuilder = new DnsNameResolverBuilder()
-                .traceEnabled(true).channelType(EventLoopUtil.getDatagramChannelClass(eventLoopGroup));
-        if (conf.getDnsLookupBindAddress() != null) {
-            InetSocketAddress addr = new InetSocketAddress(conf.getDnsLookupBindAddress(),
-                    conf.getDnsLookupBindPort());
-            dnsNameResolverBuilder.localAddress(addr);
+        if (conf.isUseNoopDnsResolver()) {
+            return NoopAddressResolverGroup.INSTANCE.getResolver(eventLoopGroup.next());
+        } else {
+            DnsNameResolverBuilder dnsNameResolverBuilder = new DnsNameResolverBuilder()
+                    .traceEnabled(true).channelType(EventLoopUtil.getDatagramChannelClass(eventLoopGroup));
+            if (conf.getDnsLookupBindAddress() != null) {
+                InetSocketAddress addr = new InetSocketAddress(conf.getDnsLookupBindAddress(),
+                        conf.getDnsLookupBindPort());
+                dnsNameResolverBuilder.localAddress(addr);
+            }
+            DnsResolverUtil.applyJdkDnsCacheSettings(dnsNameResolverBuilder);
+            // use DnsAddressResolverGroup to create the AddressResolver since it contains a solution
+            // to prevent cache stampede / thundering herds problem when a DNS entry expires while the system
+            // is under high load
+            return new DnsAddressResolverGroup(dnsNameResolverBuilder).getResolver(eventLoopGroup.next());
         }
-        DnsResolverUtil.applyJdkDnsCacheSettings(dnsNameResolverBuilder);
-        // use DnsAddressResolverGroup to create the AddressResolver since it contains a solution
-        // to prevent cache stampede / thundering herds problem when a DNS entry expires while the system
-        // is under high load
-        return new DnsAddressResolverGroup(dnsNameResolverBuilder).getResolver(eventLoopGroup.next());
     }
 
     private static final Random random = new Random();

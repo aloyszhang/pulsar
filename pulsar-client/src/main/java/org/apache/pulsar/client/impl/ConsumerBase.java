@@ -892,6 +892,11 @@ public abstract class ConsumerBase<T> extends HandlerState implements Consumer<T
 
     protected boolean enqueueMessageAndCheckBatchReceive(Message<T> message) {
         int messageSize = message.size();
+
+        if (GlobalBufferSizeSemaphore.getInstance() != null) {
+            GlobalBufferSizeSemaphore.getInstance().acquire(messageSize);
+        }
+
         // synchronize redeliverUnacknowledgedMessages().
         incomingQueueLock.lock();
         try {

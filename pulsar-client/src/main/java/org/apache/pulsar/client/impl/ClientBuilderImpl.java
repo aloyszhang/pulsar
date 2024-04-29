@@ -438,4 +438,11 @@ public class ClientBuilderImpl implements ClientBuilder {
         conf.setDescription(description);
         return this;
     }
+
+
+    @Override
+    public ClientBuilder socketAddressQuarantineTimeSeconds(int seconds) {
+        conf.setSocketAddressQuarantineTimeSeconds(seconds);
+        return this;
+    }
 }

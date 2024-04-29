@@ -87,6 +87,17 @@ public class BinaryProtoLookupService implements LookupService {
         updateServiceUrl(serviceUrl);
     }
 
+    public BinaryProtoLookupService(PulsarClientImpl client, String serviceUrl, String listenerName, boolean useTls, int quarantineTimeSeconds, ExecutorService executor)
+            throws PulsarClientException {
+        this.client = client;
+        this.useTls = useTls;
+        this.executor = executor;
+        this.maxLookupRedirects = client.getConfiguration().getMaxLookupRedirects();
+        this.serviceNameResolver = new PulsarServiceNameResolver(quarantineTimeSeconds);
+        this.listenerName = listenerName;
+        updateServiceUrl(serviceUrl);
+    }
+
     @Override
     public void updateServiceUrl(String serviceUrl) throws PulsarClientException {
         serviceNameResolver.updateServiceUrl(serviceUrl);
@@ -216,6 +227,7 @@ public class BinaryProtoLookupService implements LookupService {
             });
         }).exceptionally(connectionException -> {
             addressFuture.completeExceptionally(FutureUtil.unwrapCompletionException(connectionException));
+            serviceNameResolver.quarantineSocketAddress(socketAddress);
             return null;
         });
         return addressFuture;
@@ -249,6 +261,7 @@ public class BinaryProtoLookupService implements LookupService {
             });
         }).exceptionally(connectionException -> {
             partitionFuture.completeExceptionally(FutureUtil.unwrapCompletionException(connectionException));
+            serviceNameResolver.quarantineSocketAddress(socketAddress);
             return null;
         });
 
@@ -285,6 +298,7 @@ public class BinaryProtoLookupService implements LookupService {
             });
         }).exceptionally(ex -> {
             schemaFuture.completeExceptionally(FutureUtil.unwrapCompletionException(ex));
+            serviceNameResolver.quarantineSocketAddress(socketAddress);
             return null;
         });
 
@@ -370,6 +384,7 @@ public class BinaryProtoLookupService implements LookupService {
                 getTopicsUnderNamespace(socketAddress, namespace, backoff, remainingTime, getTopicsResultFuture,
                         mode, topicsPattern, topicsHash);
             }, nextDelay, TimeUnit.MILLISECONDS);
+            serviceNameResolver.quarantineSocketAddress(socketAddress);
             return null;
         });
     }

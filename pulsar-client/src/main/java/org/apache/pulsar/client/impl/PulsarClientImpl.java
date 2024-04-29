@@ -205,7 +205,8 @@ public class PulsarClientImpl implements PulsarClient {
                 lookup = new HttpLookupService(conf, this.eventLoopGroup);
             } else {
                 lookup = new BinaryProtoLookupService(this, conf.getServiceUrl(), conf.getListenerName(),
-                        conf.isUseTls(), this.scheduledExecutorProvider.getExecutor());
+                        conf.isUseTls(), conf.getSocketAddressQuarantineTimeSeconds(),
+                        this.scheduledExecutorProvider.getExecutor());
             }
             if (timer == null) {
                 this.timer = new HashedWheelTimer(getThreadFactory("pulsar-timer"), conf.getTickDuration(),
@@ -1023,7 +1024,7 @@ public class PulsarClientImpl implements PulsarClient {
             lookup = new HttpLookupService(conf, eventLoopGroup);
         } else {
             lookup = new BinaryProtoLookupService(this, conf.getServiceUrl(), conf.getListenerName(), conf.isUseTls(),
-                    externalExecutorProvider.getExecutor());
+                    conf.getSocketAddressQuarantineTimeSeconds(), externalExecutorProvider.getExecutor());
         }
     }
 

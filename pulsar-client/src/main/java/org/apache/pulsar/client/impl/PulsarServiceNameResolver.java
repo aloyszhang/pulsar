@@ -19,12 +19,17 @@
 package org.apache.pulsar.client.impl;
 
 import static com.google.common.base.Preconditions.checkState;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.PulsarClientException.InvalidServiceURL;
 import org.apache.pulsar.common.net.ServiceURI;
@@ -35,6 +40,7 @@ import org.apache.pulsar.common.net.ServiceURI;
 @Slf4j
 public class PulsarServiceNameResolver implements ServiceNameResolver {
 
+    private int quarantineTimeSeconds;
     private volatile ServiceURI serviceUri;
     private volatile String serviceUrl;
     private static final AtomicIntegerFieldUpdater<PulsarServiceNameResolver> CURRENT_INDEX_UPDATER =
@@ -42,9 +48,27 @@ public class PulsarServiceNameResolver implements ServiceNameResolver {
     private volatile int currentIndex;
     private volatile List<InetSocketAddress> addressList;
 
+    private Cache<String, Boolean> quarantinedSocketAddress;
+
+    public PulsarServiceNameResolver() {
+    }
+
+    public PulsarServiceNameResolver(int quarantineTimeSeconds) {
+        this.quarantineTimeSeconds = quarantineTimeSeconds;
+    }
+
     @Override
     public InetSocketAddress resolveHost() {
         List<InetSocketAddress> list = addressList;
+
+        if (quarantinedSocketAddress != null && quarantinedSocketAddress.size() > 0
+                && quarantinedSocketAddress.size() < list.size()) {
+            list = list.stream().filter(address ->
+                            quarantinedSocketAddress.getIfPresent(buildSocketAddress(address.getHostName(), address.getPort()))
+                                    == null)
+                    .collect(Collectors.toList());
+        }
+
         checkState(
             list != null, "No service url is provided yet");
         checkState(
@@ -52,7 +76,8 @@ public class PulsarServiceNameResolver implements ServiceNameResolver {
         if (list.size() == 1) {
             return list.get(0);
         } else {
-            int originalIndex = CURRENT_INDEX_UPDATER.getAndUpdate(this, last -> (last + 1) % list.size());
+            List<InetSocketAddress> finalList = list;
+            int originalIndex = CURRENT_INDEX_UPDATER.getAndUpdate(this, last -> (last + 1) % finalList.size());
             return list.get((originalIndex + 1) % list.size());
         }
     }
@@ -100,6 +125,28 @@ public class PulsarServiceNameResolver implements ServiceNameResolver {
         this.serviceUrl = serviceUrl;
         this.serviceUri = uri;
         this.currentIndex = randomIndex(addresses.size());
+
+        if (quarantineTimeSeconds > 0) {
+            this.quarantinedSocketAddress = CacheBuilder.newBuilder()
+                    .expireAfterWrite(quarantineTimeSeconds, TimeUnit.SECONDS)
+                    .removalListener((RemovalListener<String, Boolean>) address -> log.info(
+                            "InetSocketAddress {} is no longer quarantined", address.getKey())).build();
+        }
+    }
+
+    @Override
+    public void quarantineSocketAddress(String socketAddress) {
+        if (quarantinedSocketAddress != null) {
+            quarantinedSocketAddress.put(socketAddress, Boolean.TRUE);
+            log.warn("InetSocketAddress {} has been quarantined because of connection errors.", socketAddress);
+        }
+    }
+
+    @Override
+    public void quarantineSocketAddress(InetSocketAddress socketAddress) {
+        if (socketAddress != null) {
+            quarantineSocketAddress(buildSocketAddress(socketAddress.getHostName(), socketAddress.getPort()));
+        }
     }
 
     private static int randomIndex(int numAddresses) {

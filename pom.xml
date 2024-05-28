@@ -307,10 +307,16 @@ flexible messaging model and an intuitive client API.</description>
 
     <!-- Used to configure rename.netty.native. Libs -->
     <rename.netty.native.libs>rename-netty-native-libs.sh</rename.netty.native.libs>
+    <tencent.brain.jmx.version>2.0.3-20230412.093958-2</tencent.brain.jmx.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.tencent.jmx</groupId>
+        <artifactId>metricAgent</artifactId>
+        <version>${tencent.brain.jmx.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.jline</groupId>

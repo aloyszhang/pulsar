@@ -35,6 +35,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.tencent.jmx</groupId>
+      <artifactId>metricAgent</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
     </dependency>

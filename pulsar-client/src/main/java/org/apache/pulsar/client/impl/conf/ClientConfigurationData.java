@@ -337,11 +337,17 @@ public class ClientConfigurationData implements Serializable, Cloneable {
     )
     private ProxyProtocol proxyProtocol;
 
+    long tickDuration = 1;
+
     @ApiModelProperty(
             name = "enableTransaction",
             value = "Whether to enable transaction."
     )
     private boolean enableTransaction = false;
+
+    private int socketAddressQuarantineTimeSeconds = -1;
+
+    private boolean useNoopDnsResolver = false;
 
     @JsonIgnore
     private Clock clock = Clock.systemDefaultZone();

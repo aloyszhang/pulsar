@@ -115,7 +115,8 @@ class TopicStats {
 
     public static void printTopicStats(PrometheusMetricStreams stream, TopicStats stats,
                                        Optional<CompactorMXBean> compactorMXBean, String cluster, String namespace,
-                                       String topic, boolean splitTopicAndPartitionIndexLabel) {
+                                       String topic, boolean splitTopicAndPartitionIndexLabel,
+                                       boolean includeSubscriptionMetrics) {
         writeMetric(stream, "pulsar_subscriptions_count", stats.subscriptionsCount,
                 cluster, namespace, topic, splitTopicAndPartitionIndexLabel);
         writeMetric(stream, "pulsar_producers_count", stats.producersCount,
@@ -263,96 +264,103 @@ class TopicStats {
                     cluster, namespace, topic, p, producerStats.producerId, splitTopicAndPartitionIndexLabel);
         });
 
-        stats.subscriptionStats.forEach((sub, subsStats) -> {
-            writeSubscriptionMetric(stream, "pulsar_subscription_back_log", subsStats.msgBacklog,
-                    cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_back_log_no_delayed",
-                    subsStats.msgBacklogNoDelayed, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_delayed",
-                    subsStats.msgDelayed, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_msg_rate_redeliver",
-                    subsStats.msgRateRedeliver, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_unacked_messages",
-                    subsStats.unackedMessages, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_blocked_on_unacked_messages",
-                    subsStats.blockedSubscriptionOnUnackedMsgs ? 1 : 0, cluster, namespace, topic, sub,
-                    splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_msg_rate_out",
-                    subsStats.msgRateOut, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_msg_ack_rate",
-                    subsStats.messageAckRate, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_msg_throughput_out",
-                    subsStats.msgThroughputOut, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_out_bytes_total",
-                    subsStats.bytesOutCounter, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_out_messages_total",
-                    subsStats.msgOutCounter, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_last_expire_timestamp",
-                    subsStats.lastExpireTimestamp, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_last_acked_timestamp",
-                    subsStats.lastAckedTimestamp, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_last_consumed_flow_timestamp",
-                    subsStats.lastConsumedFlowTimestamp, cluster, namespace, topic, sub,
-                    splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_last_consumed_timestamp",
-                    subsStats.lastConsumedTimestamp, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_last_mark_delete_advanced_timestamp",
-                    subsStats.lastMarkDeleteAdvancedTimestamp, cluster, namespace, topic, sub,
-                    splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_msg_rate_expired",
-                    subsStats.msgRateExpired, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_total_msg_expired",
-                    subsStats.totalMsgExpired, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_msg_drop_rate",
-                    subsStats.msgDropRate, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_consumers_count",
-                    subsStats.consumersCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+        if (includeSubscriptionMetrics) {
+            stats.subscriptionStats.forEach((sub, subsStats) -> {
+                writeSubscriptionMetric(stream, "pulsar_subscription_back_log", subsStats.msgBacklog,
+                        cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_back_log_no_delayed",
+                        subsStats.msgBacklogNoDelayed, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_delayed",
+                        subsStats.msgDelayed, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_msg_rate_redeliver",
+                        subsStats.msgRateRedeliver, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_unacked_messages",
+                        subsStats.unackedMessages, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_blocked_on_unacked_messages",
+                        subsStats.blockedSubscriptionOnUnackedMsgs ? 1 : 0, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_msg_rate_out",
+                        subsStats.msgRateOut, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_msg_ack_rate",
+                        subsStats.messageAckRate, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_msg_throughput_out",
+                        subsStats.msgThroughputOut, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_out_bytes_total",
+                        subsStats.bytesOutCounter, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_out_messages_total",
+                        subsStats.msgOutCounter, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_last_expire_timestamp",
+                        subsStats.lastExpireTimestamp, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_last_acked_timestamp",
+                        subsStats.lastAckedTimestamp, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_last_consumed_flow_timestamp",
+                        subsStats.lastConsumedFlowTimestamp, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_last_consumed_timestamp",
+                        subsStats.lastConsumedTimestamp, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_last_mark_delete_advanced_timestamp",
+                        subsStats.lastMarkDeleteAdvancedTimestamp, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_msg_rate_expired",
+                        subsStats.msgRateExpired, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_total_msg_expired",
+                        subsStats.totalMsgExpired, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_msg_drop_rate",
+                        subsStats.msgDropRate, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_consumers_count",
+                        subsStats.consumersCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
 
-            writeSubscriptionMetric(stream, "pulsar_subscription_filter_processed_msg_count",
-                    subsStats.filterProcessedMsgCount, cluster, namespace, topic, sub,
-                    splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_filter_accepted_msg_count",
-                    subsStats.filterAcceptedMsgCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_filter_rejected_msg_count",
-                    subsStats.filterRejectedMsgCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_subscription_filter_rescheduled_msg_count",
-                    subsStats.filterRescheduledMsgCount, cluster, namespace, topic, sub,
-                    splitTopicAndPartitionIndexLabel);
-            writeSubscriptionMetric(stream, "pulsar_delayed_message_index_size_bytes",
-                    subsStats.delayedMessageIndexSizeInBytes, cluster, namespace, topic, sub,
-                    splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_filter_processed_msg_count",
+                        subsStats.filterProcessedMsgCount, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_filter_accepted_msg_count",
+                        subsStats.filterAcceptedMsgCount, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_filter_rejected_msg_count",
+                        subsStats.filterRejectedMsgCount, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_subscription_filter_rescheduled_msg_count",
+                        subsStats.filterRescheduledMsgCount, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
+                writeSubscriptionMetric(stream, "pulsar_delayed_message_index_size_bytes",
+                        subsStats.delayedMessageIndexSizeInBytes, cluster, namespace, topic, sub,
+                        splitTopicAndPartitionIndexLabel);
 
-            final String[] subscriptionLabel = {"subscription", sub};
-            for (TopicMetricBean topicMetricBean : subsStats.bucketDelayedIndexStats.values()) {
-                String[] labelsAndValues = ArrayUtils.addAll(subscriptionLabel, topicMetricBean.labelsAndValues);
-                writeTopicMetric(stream, topicMetricBean.name, topicMetricBean.value, cluster, namespace,
-                        topic, splitTopicAndPartitionIndexLabel, labelsAndValues);
-            }
+                final String[] subscriptionLabel = {"subscription", sub};
+                for (TopicMetricBean topicMetricBean : subsStats.bucketDelayedIndexStats.values()) {
+                    String[] labelsAndValues = ArrayUtils.addAll(subscriptionLabel, topicMetricBean.labelsAndValues);
+                    writeTopicMetric(stream, topicMetricBean.name, topicMetricBean.value, cluster, namespace,
+                            topic, splitTopicAndPartitionIndexLabel, labelsAndValues);
+                }
 
-            subsStats.consumerStat.forEach((c, consumerStats) -> {
-                writeConsumerMetric(stream, "pulsar_consumer_msg_rate_redeliver", consumerStats.msgRateRedeliver,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
-                writeConsumerMetric(stream, "pulsar_consumer_unacked_messages", consumerStats.unackedMessages,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
-                writeConsumerMetric(stream, "pulsar_consumer_blocked_on_unacked_messages",
-                        consumerStats.blockedSubscriptionOnUnackedMsgs ? 1 : 0,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
-                writeConsumerMetric(stream, "pulsar_consumer_msg_rate_out", consumerStats.msgRateOut,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                subsStats.consumerStat.forEach((c, consumerStats) -> {
+                    writeConsumerMetric(stream, "pulsar_consumer_msg_rate_redeliver", consumerStats.msgRateRedeliver,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_consumer_unacked_messages", consumerStats.unackedMessages,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_consumer_blocked_on_unacked_messages",
+                            consumerStats.blockedSubscriptionOnUnackedMsgs ? 1 : 0,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_consumer_msg_rate_out", consumerStats.msgRateOut,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
 
-                writeConsumerMetric(stream, "pulsar_consumer_msg_ack_rate", consumerStats.msgAckRate,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_consumer_msg_ack_rate", consumerStats.msgAckRate,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
 
-                writeConsumerMetric(stream, "pulsar_consumer_msg_throughput_out", consumerStats.msgThroughputOut,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
-                writeConsumerMetric(stream, "pulsar_consumer_available_permits", consumerStats.availablePermits,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
-                writeConsumerMetric(stream, "pulsar_out_bytes_total", consumerStats.bytesOutCounter,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
-                writeConsumerMetric(stream, "pulsar_out_messages_total", consumerStats.msgOutCounter,
-                        cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_consumer_msg_throughput_out", consumerStats.msgThroughputOut,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_consumer_available_permits", consumerStats.availablePermits,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_out_bytes_total", consumerStats.bytesOutCounter,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                    writeConsumerMetric(stream, "pulsar_out_messages_total", consumerStats.msgOutCounter,
+                            cluster, namespace, topic, sub, c, splitTopicAndPartitionIndexLabel);
+                });
             });
-        });
+        }
 
         if (!stats.replicationStats.isEmpty()) {
             stats.replicationStats.forEach((remoteCluster, replStats) -> {

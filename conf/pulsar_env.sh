@@ -71,14 +71,14 @@ PULSAR_GC_LOG_DIR=${PULSAR_GC_LOG_DIR:-"${PULSAR_LOG_DIR}"}
 
 if [[ -z "$PULSAR_GC_LOG" ]]; then
   if [[ $JAVA_MAJOR_VERSION -gt 8 ]]; then
-    PULSAR_GC_LOG="-Xlog:gc*,safepoint:${PULSAR_GC_LOG_DIR}/pulsar_gc_%p.log:time,uptime,tags:filecount=10,filesize=20M"
+    PULSAR_GC_LOG="-Xlog:gc*,safepoint:${PULSAR_GC_LOG_DIR}/pulsar_gc_%p.log:time,uptime,tags:filecount=10,filesize=200M"
     if [[ $JAVA_MAJOR_VERSION -ge 17 ]]; then
       # Use async logging on Java 17+ https://bugs.openjdk.java.net/browse/JDK-8264323
       PULSAR_GC_LOG="-Xlog:async ${PULSAR_GC_LOG}"
     fi
   else
     # Java 8 gc log options
-    PULSAR_GC_LOG="-Xloggc:${PULSAR_GC_LOG_DIR}/pulsar_gc_%p.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=20M"
+    PULSAR_GC_LOG="-Xloggc:${PULSAR_GC_LOG_DIR}/pulsar_gc_%p.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=200M"
   fi
 fi
 

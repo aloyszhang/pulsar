@@ -62,4 +62,21 @@ public interface ServiceNameResolver {
      */
     void updateServiceUrl(String serviceUrl) throws InvalidServiceURL;
 
+    /**
+     * Quarantine SocketAddress.
+     *
+     * @param socketAddress socketAddress
+     */
+    void quarantineSocketAddress(String socketAddress);
+
+    /**
+     * Quarantine SocketAddress.
+     *
+     * @param socketAddress socketAddress
+     */
+    void quarantineSocketAddress(InetSocketAddress socketAddress);
+
+    default String buildSocketAddress(String hostName, int port) {
+        return hostName + ":" + port;
+    }
 }

@@ -856,6 +856,7 @@ public class ModularLoadManagerImpl implements ModularLoadManager {
                 Optional<String> broker = selectBroker(serviceUnit);
                 if (!broker.isPresent()) {
                     // If no broker is selected, return empty.
+                    log.warn("Non broker select for bundle {}", bundle);
                     return broker;
                 }
                 // Add new bundle to preallocated.
@@ -948,6 +949,7 @@ public class ModularLoadManagerImpl implements ModularLoadManager {
 
             if (!broker.isPresent()) {
                 // No brokers available
+                log.warn("Non broker select for bundle {}", bundle);
                 return broker;
             }
 
@@ -958,12 +960,16 @@ public class ModularLoadManagerImpl implements ModularLoadManager {
                 LoadManagerShared.applyNamespacePolicies(serviceUnit, policies, brokerCandidateCache,
                         getAvailableBrokers(),
                         brokerTopicLoadingPredicate);
+                log.warn("Selected broker {} is overloaded, selecting from full list of brokers {} for bundle {}",
+                        broker, brokerCandidateCache, bundle);
                 Optional<String> brokerTmp =
                         placementStrategy.selectBroker(brokerCandidateCache, data, loadData, conf);
                 if (brokerTmp.isPresent()) {
                     broker = brokerTmp;
                 }
             }
+            log.info("Selected broker {} for assignment of bundle {}", broker, bundle);
+
             return broker;
         }
     }

@@ -318,6 +318,13 @@ flexible messaging model and an intuitive client API.</description>
         <version>${tencent.brain.jmx.version}</version>
       </dependency>
 
+
+      <dependency>
+        <groupId>com.tencent.jmx</groupId>
+        <artifactId>metricAgent</artifactId>
+        <version>${tencent.brain.jmx.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.jline</groupId>
         <artifactId>jline</artifactId>

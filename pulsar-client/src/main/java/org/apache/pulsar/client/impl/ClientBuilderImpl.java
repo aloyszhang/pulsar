@@ -79,6 +79,11 @@ public class ClientBuilderImpl implements ClientBuilder {
         return this;
     }
 
+    public ClientBuilder tickDuration(long tickDuration) {
+        conf.setTickDuration(tickDuration);
+        return this;
+    }
+
     @Override
     public ClientBuilder serviceUrl(String serviceUrl) {
         checkArgument(StringUtils.isNotBlank(serviceUrl), "Param serviceUrl must not be blank.");
@@ -431,6 +436,19 @@ public class ClientBuilderImpl implements ClientBuilder {
             throw new IllegalArgumentException("description should be at most 64 characters");
         }
         conf.setDescription(description);
+        return this;
+    }
+
+
+    @Override
+    public ClientBuilder socketAddressQuarantineTimeSeconds(int seconds) {
+        conf.setSocketAddressQuarantineTimeSeconds(seconds);
+        return this;
+    }
+
+    @Override
+    public ClientBuilder useNoopDnsResolver(boolean useNoopDns) {
+        conf.setUseNoopDnsResolver(useNoopDns);
         return this;
     }
 }

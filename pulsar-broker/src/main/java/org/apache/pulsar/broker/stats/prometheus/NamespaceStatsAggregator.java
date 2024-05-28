@@ -74,6 +74,7 @@ public class NamespaceStatsAggregator {
                                 PrometheusMetricStreams stream) {
         String cluster = pulsar.getConfiguration().getClusterName();
         AggregatedBrokerStats brokerStats = localBrokerStats.get();
+        boolean includeSubscriptionMetrics =  pulsar.getConfiguration().isExposeSubscriptionLevelMetricsInPrometheus();
         brokerStats.reset();
         AggregatedNamespaceStats namespaceStats = localNamespaceStats.get();
         TopicStats topicStats = localTopicStats.get();
@@ -96,7 +97,7 @@ public class NamespaceStatsAggregator {
                 if (includeTopicMetrics) {
                     topicsCount.add(1);
                     TopicStats.printTopicStats(stream, topicStats, compactorMXBean, cluster, namespace, name,
-                            splitTopicAndPartitionIndexLabel);
+                            splitTopicAndPartitionIndexLabel, includeSubscriptionMetrics);
                 } else {
                     namespaceStats.updateStats(topicStats);
                 }

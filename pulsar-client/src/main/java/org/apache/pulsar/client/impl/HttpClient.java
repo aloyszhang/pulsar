@@ -69,7 +69,7 @@ public class HttpClient implements Closeable {
 
     protected HttpClient(ClientConfigurationData conf, EventLoopGroup eventLoopGroup) throws PulsarClientException {
         this.authentication = conf.getAuthentication();
-        this.serviceNameResolver = new PulsarServiceNameResolver();
+        this.serviceNameResolver = new PulsarServiceNameResolver(conf.getSocketAddressQuarantineTimeSeconds());
         this.serviceNameResolver.updateServiceUrl(conf.getServiceUrl());
 
         DefaultAsyncHttpClientConfig.Builder confBuilder = new DefaultAsyncHttpClientConfig.Builder();
@@ -225,8 +225,10 @@ public class HttpClient implements Closeable {
 
                 builder.execute().toCompletableFuture().whenComplete((response2, t) -> {
                     if (t != null) {
-                        log.warn("[{}] Failed to perform http request: {}", requestUrl, t.getMessage());
+                        log.error("[{}] Failed to perform http request: {}", requestUrl, t.getMessage());
                         future.completeExceptionally(new PulsarClientException(t));
+                        serviceNameResolver.quarantineSocketAddress(
+                                serviceNameResolver.buildSocketAddress(hostUri.getHost(), hostUri.getPort()));
                         return;
                     }
 

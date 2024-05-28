@@ -541,6 +541,7 @@ public class NamespaceService implements AutoCloseable {
                 if (options.isAuthoritative()) {
                     // leader broker already assigned the current broker as owner
                     candidateBroker = pulsar.getBrokerId();
+                    LOG.info("Try assigning namespace {} to local broker {} as owner", bundle, candidateBroker);
                 } else {
                     LoadManager loadManager = this.loadManager.get();
                     boolean makeLoadManagerDecisionOnThisBroker = !loadManager.isCentralized() || les.isLeader();

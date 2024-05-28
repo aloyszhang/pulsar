@@ -492,6 +492,29 @@ public class ServiceConfiguration implements PulsarConfiguration {
     )
     private boolean skipBrokerShutdownOnOOM = false;
 
+
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            dynamic = true,
+            doc = "The minimum receive buffer size for AdaptiveRecvByteBufAllocator"
+    )
+    private int minReceiveByteBuf = 1024;
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            dynamic = true,
+            doc = "The init receive buffer size for AdaptiveRecvByteBufAllocator"
+    )
+    private int initReceiveByteBuf = 16 * 1024;
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            dynamic = true,
+            doc = "The max receive buffer size for AdaptiveRecvByteBufAllocator"
+    )
+    private int maxReceiveByteBuf = 1 * 1024 * 1024;
+
     @FieldContext(
             category = CATEGORY_SERVER,
             doc = "Amount of seconds to timeout when loading a topic. In situations with many geo-replicated clusters, "
@@ -843,7 +866,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
                     + "the default is false, which means it is not enabled. "
                     + "When there are a large number of share or key share consumers in the cluster, "
                     + "it can be enabled to reduce the memory consumption caused by pendingAcks.")
-    private boolean autoShrinkForConsumerPendingAcksMap = false;
+    private boolean autoShrinkForConsumerPendingAcksMap = true;
 
     @FieldContext(
         category = CATEGORY_SERVER,
@@ -875,6 +898,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private int maxUnackedMessagesPerSubscription = 4 * 50000;
     @FieldContext(
         category = CATEGORY_POLICIES,
+        dynamic = true,
         doc = "Max number of unacknowledged messages allowed per broker. \n\n"
             + " Once this limit reaches, broker will stop dispatching messages to all shared subscription "
             + " which has higher number of unack messages until subscriptions start acknowledging messages "
@@ -883,6 +907,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private int maxUnackedMessagesPerBroker = 0;
     @FieldContext(
         category = CATEGORY_POLICIES,
+        dynamic = true,
         doc = "Once broker reaches maxUnackedMessagesPerBroker limit, it blocks subscriptions which has higher "
             + " unacked messages than this percentage limit and subscription will not receive any new messages "
             + " until that subscription acks back `limit/2` messages")
@@ -2845,6 +2870,12 @@ public class ServiceConfiguration implements PulsarConfiguration {
         doc = "If true, export consumer level metrics otherwise namespace level"
     )
     private boolean exposeConsumerLevelMetricsInPrometheus = false;
+    @FieldContext(
+            category = CATEGORY_METRICS,
+            dynamic = true,
+            doc = "If true, export subscription level metrics"
+    )
+    private boolean exposeSubscriptionLevelMetricsInPrometheus = true;
     @FieldContext(
             category = CATEGORY_METRICS,
             doc = "If true, export producer level metrics otherwise namespace level"

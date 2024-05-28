@@ -34,6 +34,12 @@
   <name>Pulsar Broker</name>
 
   <dependencies>
+
+    <dependency>
+      <groupId>com.tencent.jmx</groupId>
+      <artifactId>metricAgent</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>com.tencent.jmx</groupId>
       <artifactId>metricAgent</artifactId>

@@ -615,4 +615,20 @@ public interface ClientBuilder extends Serializable, Cloneable {
      * @return
      */
     ClientBuilder socks5ProxyPassword(String socks5ProxyPassword);
+
+    /**
+     * Set the time for which a socketAddress will be quarantined.
+     *
+     * @param seconds whether enable transaction feature
+     * @return
+     */
+    ClientBuilder socketAddressQuarantineTimeSeconds(int seconds);
+
+    /**
+     * Use noop Dns Resolver, Default false.
+     *
+     * @param useNoopDns whether enable noop dns
+     * @return
+     */
+    ClientBuilder useNoopDnsResolver(boolean useNoopDns);
 }

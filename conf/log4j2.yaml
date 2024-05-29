@@ -168,6 +168,12 @@ Configuration:
         AppenderRef:
           - ref: Console
 
+      - name: com.tencent.pulsar.broker.interceptor.reporter.LocalFileMetricsReporter
+        level: info
+        additivity: false
+        AppenderRef:
+          - ref: IndexFile
+
     # Logger to inject filter script
 #     - name: org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl
 #       level: debug

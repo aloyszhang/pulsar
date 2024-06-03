@@ -2855,8 +2855,8 @@ public class BrokerService implements Closeable {
                         + "metricsDestinations is empty, will not change current report targets.");
                 return;
             }
-            log.info("[InLongMetricsConfiguration] metricsDestinations is changed to {}", metricReportTargets);
             interceptor.onInLongMetricsReportTargetsModify(metricReportTargets);
+            log.info("[InLongMetricsConfiguration] metricsDestinations is changed to {}", metricReportTargets);
         } else {
             log.warn("[InLongMetricsConfiguration] interceptor is null");
         }
@@ -2871,8 +2871,8 @@ public class BrokerService implements Closeable {
                         + " range of 0(no included) to {}", INLONG_METRIC_CACHE_SIZE_UPPER_BOUND);
                 return;
             }
-            log.info("[InLongMetricsConfiguration] maxMetricsCacheSize is changed to {}", maxMetricsCacheSize);
             interceptor.onInLongMetricsMaxMetricsCacheSizeModify(maxMetricsCacheSize);
+            log.info("[InLongMetricsConfiguration] maxMetricsCacheSize is changed to {}", maxMetricsCacheSize);
         } else {
             log.warn("[InLongMetricsConfiguration] interceptor is null");
         }
@@ -2887,8 +2887,8 @@ public class BrokerService implements Closeable {
                         + " should be in range of 0(no included) to metricsReportInterval: {}.", metricsReportInterval);
                 return;
             }
-            log.info("[InLongMetricsConfiguration] metricsCacheFlushTimeout is changed to {}", metricsCacheFlushTimeout);
             interceptor.onInLongMetricsCacheFlushTimeoutModify(metricsCacheFlushTimeout);
+            log.info("[InLongMetricsConfiguration] metricsCacheFlushTimeout is changed to {}", metricsCacheFlushTimeout);
         } else {
             log.warn("[InLongMetricsConfiguration] interceptor is null");
         }
@@ -2899,9 +2899,9 @@ public class BrokerService implements Closeable {
         if (interceptor != null) {
             boolean recordMetricsWhenSendToConsume =
                     pulsar.getConfiguration().isRecordMetricsWhenSendMessageToConsumer();
+            interceptor.onInLongConsumeMetricsRecordTypeModify(recordMetricsWhenSendToConsume);
             log.info("[InLongMetricsConfiguration] updateInlongConsumMetricsRecord recordMetricsWhenSendToConsume: {}",
                     recordMetricsWhenSendToConsume);
-            interceptor.onInLongConsumeMetricsRecordTypeModify(recordMetricsWhenSendToConsume);
         } else {
             log.warn("[InLongMetricsConfiguration] interceptor is null");
         }

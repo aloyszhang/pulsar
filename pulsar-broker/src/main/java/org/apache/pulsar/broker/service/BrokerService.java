@@ -2844,7 +2844,6 @@ public class BrokerService implements Closeable {
                 maxUnackedMessages, maxUnackedMsgsPerDispatcher);
     }
 
-    public static final Set<String> INLONG_METRICS_REPORT_TARGETS = Sets.newHashSet("inlong", "inlong-metrics");
     // set 1GB as upper limit
     private static final long INLONG_METRIC_CACHE_SIZE_UPPER_BOUND = 1073741824L;
     private void updateInlongMetricsReportTargets() {

@@ -36,7 +36,6 @@ import org.apache.pulsar.common.naming.SystemTopicNames;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfoImpl;
-import org.apache.pulsar.common.policies.data.TopicType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -63,13 +62,10 @@ public abstract class ExtensibleLoadManagerImplBaseTest extends MockedPulsarServ
 
     protected ServiceConfiguration initConfig(ServiceConfiguration conf) {
         conf.setForceDeleteNamespaceAllowed(true);
-        conf.setAllowAutoTopicCreationType(TopicType.NON_PARTITIONED);
-        conf.setAllowAutoTopicCreation(true);
         conf.setLoadManagerClassName(ExtensibleLoadManagerImpl.class.getName());
         conf.setLoadBalancerLoadSheddingStrategy(TransferShedder.class.getName());
         conf.setLoadBalancerSheddingEnabled(false);
         conf.setLoadBalancerDebugModeEnabled(true);
-        conf.setTopicLevelPoliciesEnabled(true);
         return conf;
     }
 
@@ -103,8 +99,14 @@ public abstract class ExtensibleLoadManagerImplBaseTest extends MockedPulsarServ
     @Override
     @AfterClass(alwaysRun = true)
     protected void cleanup() throws Exception {
-        this.additionalPulsarTestContext.close();
+        if (additionalPulsarTestContext != null) {
+            additionalPulsarTestContext.close();
+            additionalPulsarTestContext = null;
+        }
         super.internalCleanup();
+        pulsar1 = pulsar2 = null;
+        primaryLoadManager = secondaryLoadManager = null;
+        channel1 = channel2 = null;
     }
 
     @BeforeMethod(alwaysRun = true)

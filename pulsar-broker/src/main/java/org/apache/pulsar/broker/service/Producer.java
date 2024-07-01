@@ -691,7 +691,7 @@ public class Producer {
 
     @Override
     public String toString() {
-        return MoreObjects.toStringHelper(this).add("topic", topic).add("client", cnx.clientAddress())
+        return MoreObjects.toStringHelper(this).add("topic", topic).add("client", cnx.toString())
                 .add("producerName", producerName).add("producerId", producerId).toString();
     }
 
@@ -770,7 +770,7 @@ public class Producer {
         }
         if (this.isNonPersistentTopic) {
             msgDrop.calculateRate();
-            ((NonPersistentPublisherStatsImpl) stats).msgDropRate = msgDrop.getRate();
+            ((NonPersistentPublisherStatsImpl) stats).msgDropRate = msgDrop.getValueRate();
         }
     }
 

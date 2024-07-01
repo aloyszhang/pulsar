@@ -122,6 +122,8 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
     }
 
     private void recover() {
+        log.info("[{}]Transaction buffer recover start, current state: {}", topic.getName(), getState());
+
         recoverTime.setRecoverStartTime(System.currentTimeMillis());
         this.topic.getBrokerService().getPulsar().getTransactionExecutorProvider().getExecutor(this)
                 .execute(new TopicTransactionBufferRecover(new TopicTransactionBufferRecoverCallBack() {
@@ -606,7 +608,10 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
                         this, topic.getName());
                 return;
             }
+            log.info("TopicTransactionBufferRecover start topic :{}", topic.getName());
             abortedTxnProcessor.recoverFromSnapshot().thenAcceptAsync(startReadCursorPosition -> {
+                log.info("recoverFromSnapshot complete topic :{}", topic.getName());
+
                 //Transaction is not use for this topic, so just make maxReadPosition as LAC.
                 if (startReadCursorPosition == null) {
                     callBack.noNeedToRecover();

@@ -237,7 +237,10 @@ public class SnapshotSegmentAbortedTxnProcessorImpl implements AbortedTxnProcess
                               in segments to aborts.
                           </p>
                          */
+                        log.info("recoverFromSnapshot read start, topic :{}", topic.getName());
+                        int count = 0;
                         while (reader.hasMoreEvents()) {
+                            count++;
                             Message<TransactionBufferSnapshotIndexes> message = reader.readNextAsync()
                                     .get(getSystemClientOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             if (topic.getName().equals(message.getKey())) {
@@ -250,6 +253,8 @@ public class SnapshotSegmentAbortedTxnProcessorImpl implements AbortedTxnProcess
                                 }
                             }
                         }
+                        log.info("recoverFromSnapshot read end, topic :{}, eventCunt :{}", topic.getName(), count);
+
                     } catch (TimeoutException ex) {
                         Throwable t = FutureUtil.unwrapCompletionException(ex);
                         String errorMessage = String.format("[%s] Transaction buffer recover fail by read "

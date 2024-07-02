@@ -18,7 +18,6 @@
  */
 package org.apache.pulsar.broker.service.nonpersistent;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.bookkeeper.mledger.impl.cache.RangeEntryCacheManagerImpl.create;
 import static org.apache.pulsar.common.policies.data.BacklogQuota.BacklogQuotaType;
 import static org.apache.pulsar.common.protocol.Commands.DEFAULT_CONSUMER_EPOCH;
@@ -55,7 +54,6 @@ import org.apache.pulsar.broker.service.BrokerServiceException.TopicFencedExcept
 import org.apache.pulsar.broker.service.BrokerServiceException.UnsupportedVersionException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Dispatcher;
-import org.apache.pulsar.broker.service.Producer;
 import org.apache.pulsar.broker.service.Replicator;
 import org.apache.pulsar.broker.service.StreamingStats;
 import org.apache.pulsar.broker.service.Subscription;
@@ -245,14 +243,6 @@ public class NonPersistentTopic extends AbstractTopic implements Topic, TopicPol
     }
 
     @Override
-    public void removeProducer(Producer producer) {
-        checkArgument(producer.getTopic() == this);
-        if (producers.remove(producer.getProducerName(), producer)) {
-            handleProducerRemoved(producer);
-        }
-    }
-
-    @Override
     public CompletableFuture<Void> checkIfTransactionBufferRecoverCompletely(boolean isTxnEnabled) {
         return  CompletableFuture.completedFuture(null);
     }
@@ -418,7 +408,7 @@ public class NonPersistentTopic extends AbstractTopic implements Topic, TopicPol
             CompletableFuture<Void> closeClientFuture = new CompletableFuture<>();
             if (closeIfClientsConnected) {
                 List<CompletableFuture<Void>> futures = new ArrayList<>();
-                replicators.forEach((cluster, replicator) -> futures.add(replicator.disconnect()));
+                replicators.forEach((cluster, replicator) -> futures.add(replicator.terminate()));
                 producers.values().forEach(producer -> futures.add(producer.disconnect()));
                 subscriptions.forEach((s, sub) -> futures.add(sub.disconnect()));
                 FutureUtil.waitForAll(futures).thenRun(() -> {
@@ -475,7 +465,8 @@ public class NonPersistentTopic extends AbstractTopic implements Topic, TopicPol
                 }
             }).exceptionally(ex -> {
                 deleteFuture.completeExceptionally(
-                        new TopicBusyException("Failed to close clients before deleting topic."));
+                        new TopicBusyException("Failed to close clients before deleting topic.",
+                                FutureUtil.unwrapCompletionException(ex)));
                 return null;
             });
         } finally {
@@ -510,7 +501,7 @@ public class NonPersistentTopic extends AbstractTopic implements Topic, TopicPol
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        replicators.forEach((cluster, replicator) -> futures.add(replicator.disconnect()));
+        replicators.forEach((cluster, replicator) -> futures.add(replicator.terminate()));
         producers.values().forEach(producer -> futures.add(producer.disconnect()));
         if (topicPublishRateLimiter != null) {
             topicPublishRateLimiter.close();
@@ -555,7 +546,7 @@ public class NonPersistentTopic extends AbstractTopic implements Topic, TopicPol
 
     public CompletableFuture<Void> stopReplProducers() {
         List<CompletableFuture<Void>> closeFutures = new ArrayList<>();
-        replicators.forEach((region, replicator) -> closeFutures.add(replicator.disconnect()));
+        replicators.forEach((region, replicator) -> closeFutures.add(replicator.terminate()));
         return FutureUtil.waitForAll(closeFutures);
     }
 
@@ -635,7 +626,7 @@ public class NonPersistentTopic extends AbstractTopic implements Topic, TopicPol
 
         String name = NonPersistentReplicator.getReplicatorName(replicatorPrefix, remoteCluster);
 
-        replicators.get(remoteCluster).disconnect().thenRun(() -> {
+        replicators.get(remoteCluster).terminate().thenRun(() -> {
             log.info("[{}] Successfully removed replicator {}", name, remoteCluster);
             replicators.remove(remoteCluster);
 

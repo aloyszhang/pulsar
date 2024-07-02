@@ -290,6 +290,8 @@ public class PersistentTopicTest extends MockedBookKeeperTestCase {
         }).when(ledgerMock).asyncAddEntry(any(ByteBuf.class), any(AddEntryCallback.class), any());
 
         PersistentTopic topic = new PersistentTopic(successTopicName, ledgerMock, brokerService);
+        long lastMaxReadPositionMovedForwardTimestamp = topic.getLastMaxReadPositionMovedForwardTimestamp();
+
         /*
          * MessageMetadata.Builder messageMetadata = MessageMetadata.newBuilder();
          * messageMetadata.setPublishTime(System.currentTimeMillis()); messageMetadata.setProducerName("producer-name");
@@ -314,10 +316,10 @@ public class PersistentTopicTest extends MockedBookKeeperTestCase {
                 assertEquals(entryData.array(), payload.array());
             }
         };
-
         topic.publishMessage(payload, publishContext);
 
         assertTrue(latch.await(1, TimeUnit.SECONDS));
+        assertTrue(topic.getLastMaxReadPositionMovedForwardTimestamp() > lastMaxReadPositionMovedForwardTimestamp);
     }
 
     @Test
@@ -1785,12 +1787,12 @@ public class PersistentTopicTest extends MockedBookKeeperTestCase {
                         any(), eq(null)
                 );
 
-        replicator.disconnect(false);
-        replicator.disconnect(false);
+        replicator.terminate();
+        replicator.terminate();
 
         replicator.startProducer();
 
-        verify(clientImpl, Mockito.times(2)).createProducerAsync(any(), any(), any());
+        verify(clientImpl, Mockito.times(1)).createProducerAsync(any(), any(), any());
     }
 
     @Test

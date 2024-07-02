@@ -47,6 +47,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -54,6 +56,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.LedgerHandle;
@@ -63,12 +66,12 @@ import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.PrometheusMetricsTestUtil;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.BrokerTestBase;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.TopicPoliciesService;
 import org.apache.pulsar.broker.stats.PrometheusMetricsTest;
-import org.apache.pulsar.broker.stats.prometheus.PrometheusMetricsGenerator;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
@@ -79,6 +82,7 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 import org.apache.pulsar.client.api.SubscriptionMode;
 import org.apache.pulsar.client.api.SubscriptionType;
 import org.apache.pulsar.common.naming.NamespaceBundle;
@@ -110,6 +114,11 @@ public class PersistentTopicTest extends BrokerTestBase {
     @Override
     protected void cleanup() throws Exception {
         super.internalCleanup();
+    }
+
+    @Override protected void doInitConf() throws Exception {
+        super.doInitConf();
+        this.conf.setManagedLedgerCursorBackloggedThreshold(10);
     }
 
     /**
@@ -315,6 +324,83 @@ public class PersistentTopicTest extends BrokerTestBase {
         }
     }
 
+    @DataProvider(name = "closeWithoutWaitingClientDisconnectInFirstBatch")
+    public Object[][] closeWithoutWaitingClientDisconnectInFirstBatch() {
+        return new Object[][]{
+                new Object[] {true},
+                new Object[] {false},
+        };
+    }
+
+    @Test(dataProvider = "closeWithoutWaitingClientDisconnectInFirstBatch")
+    public void testConcurrentClose(boolean closeWithoutWaitingClientDisconnectInFirstBatch) throws Exception {
+        final String topicName = "persistent://prop/ns/concurrentClose";
+        final String ns = "prop/ns";
+        admin.namespaces().createNamespace(ns, 1);
+        admin.topics().createNonPartitionedTopic(topicName);
+        final Topic topic = pulsar.getBrokerService().getTopicIfExists(topicName).get().get();
+        List<CompletableFuture<Void>> futureList =
+                make2ConcurrentBatchesOfClose(topic, 10, closeWithoutWaitingClientDisconnectInFirstBatch);
+        Map<Integer, List<CompletableFuture<Void>>> futureMap =
+                futureList.stream().collect(Collectors.groupingBy(Objects::hashCode));
+        /**
+         * The first call: get the return value of "topic.close".
+         * The other 19 calls: get the cached value which related {@link PersistentTopic#closeFutures}.
+         */
+        assertTrue(futureMap.size() <= 3);
+        for (List list : futureMap.values()){
+            if (list.size() == 1){
+                // This is the first call, the future is the return value of `topic.close`.
+            } else {
+                // Two types future list: wait client close or not.
+                assertTrue(list.size() >= 9 && list.size() <= 10);
+            }
+        }
+    }
+
+    private List<CompletableFuture<Void>> make2ConcurrentBatchesOfClose(Topic topic, int tryTimes,
+                                                              boolean closeWithoutWaitingClientDisconnectInFirstBatch){
+        final List<CompletableFuture<Void>> futureList = Collections.synchronizedList(new ArrayList<>());
+        final List<Thread> taskList = new ArrayList<>();
+        CountDownLatch allTaskBeginLatch = new CountDownLatch(1);
+        // Call a batch of close.
+        for (int i = 0; i < tryTimes; i++) {
+            Thread thread = new Thread(() -> {
+                try {
+                    allTaskBeginLatch.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                futureList.add(topic.close(closeWithoutWaitingClientDisconnectInFirstBatch));
+            });
+            thread.start();
+            taskList.add(thread);
+        }
+        // Call another batch of close.
+        for (int i = 0; i < tryTimes; i++) {
+            Thread thread = new Thread(() -> {
+                try {
+                    allTaskBeginLatch.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                futureList.add(topic.close(!closeWithoutWaitingClientDisconnectInFirstBatch));
+            });
+            thread.start();
+            taskList.add(thread);
+        }
+        // Wait close task executed.
+        allTaskBeginLatch.countDown();
+        Awaitility.await().atMost(5, TimeUnit.SECONDS).until(()->{
+            for (Thread thread : taskList){
+                if (thread.isAlive()){
+                    return false;
+                }
+            }
+            return true;
+        });
+        return futureList;
+    }
 
     @DataProvider(name = "topicAndMetricsLevel")
     public Object[][] indexPatternTestData() {
@@ -323,7 +409,6 @@ public class PersistentTopicTest extends BrokerTestBase {
                 new Object[] {"persistent://prop/autoNs/test_delayed_message_metric", false},
         };
     }
-
 
     @Test(dataProvider = "topicAndMetricsLevel")
     public void testDelayedDeliveryTrackerMemoryUsageMetric(String topic, boolean exposeTopicLevelMetrics) throws Exception {
@@ -360,7 +445,7 @@ public class PersistentTopicTest extends BrokerTestBase {
 
         latch.await(10, TimeUnit.SECONDS);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrometheusMetricsGenerator.generate(pulsar, exposeTopicLevelMetrics, true, true, output);
+        PrometheusMetricsTestUtil.generate(pulsar, exposeTopicLevelMetrics, true, true, output);
         String metricsStr = output.toString(StandardCharsets.UTF_8);
 
         Multimap<String, PrometheusMetricsTest.Metric> metricsMap = PrometheusMetricsTest.parseMetrics(metricsStr);
@@ -680,7 +765,7 @@ public class PersistentTopicTest extends BrokerTestBase {
         ManagedLedgerImpl ledger = (ManagedLedgerImpl)persistentTopic.getManagedLedger();
         final ManagedCursor spyCursor= spy(ledger.newNonDurableCursor(PositionImpl.LATEST, "sub-2"));
         doAnswer((invocation) -> {
-            Thread.sleep(10_000);
+            Thread.sleep(5_000);
             invocation.callRealMethod();
             return null;
         }).when(spyCursor).asyncReadEntriesOrWait(any(int.class), any(long.class),
@@ -706,5 +791,53 @@ public class PersistentTopicTest extends BrokerTestBase {
                 .untilAsserted(() -> {
                     assertEquals(ledger.getWaitingCursorsCount(), 0);
         });
+    }
+
+    @Test
+    public void testAddWaitingCursorsForNonDurable2() throws Exception {
+        final String ns = "prop/ns-test";
+        admin.namespaces().createNamespace(ns, 2);
+        final String topicName = "persistent://prop/ns-test/testAddWaitingCursors2";
+        admin.topics().createNonPartitionedTopic(topicName);
+        pulsarClient.newConsumer(Schema.STRING).topic(topicName)
+                .subscriptionMode(SubscriptionMode.Durable)
+                .subscriptionType(SubscriptionType.Shared)
+                .subscriptionName("sub-1").subscribe().close();
+        @Cleanup
+        final Producer<String> producer = pulsarClient.newProducer(Schema.STRING).enableBatching(false).topic(topicName).create();
+        for (int i = 0; i < 100; i ++) {
+            producer.sendAsync("test-" + i);
+        }
+        @Cleanup
+        final Consumer<String> consumer = pulsarClient.newConsumer(Schema.STRING).topic(topicName)
+                .subscriptionMode(SubscriptionMode.NonDurable)
+                .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                .subscriptionType(SubscriptionType.Exclusive)
+                .subscriptionName("sub-2").subscribe();
+        int count = 0;
+        while(true) {
+            final Message<String> msg = consumer.receive(3, TimeUnit.SECONDS);
+            if (msg != null) {
+                consumer.acknowledge(msg);
+                count++;
+            } else {
+                break;
+            }
+        }
+        Assert.assertEquals(count, 100);
+        Thread.sleep(3_000);
+        for (int i = 0; i < 100; i ++) {
+            producer.sendAsync("test-" + i);
+        }
+        while(true) {
+            final Message<String> msg = consumer.receive(5, TimeUnit.SECONDS);
+            if (msg != null) {
+                consumer.acknowledge(msg);
+                count++;
+            } else {
+                break;
+            }
+        }
+        Assert.assertEquals(count, 200);
     }
 }

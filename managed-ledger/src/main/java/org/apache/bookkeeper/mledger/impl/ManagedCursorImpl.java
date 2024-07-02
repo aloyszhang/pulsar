@@ -350,15 +350,19 @@ public class ManagedCursorImpl implements ManagedCursor {
             final Function<Map<String, String>, Map<String, String>> updateFunction) {
         CompletableFuture<Void> updateCursorPropertiesResult = new CompletableFuture<>();
 
-        final Stat lastCursorLedgerStat = ManagedCursorImpl.this.cursorLedgerStat;
-
         Map<String, String> newProperties = updateFunction.apply(ManagedCursorImpl.this.cursorProperties);
+        if (!isDurable()) {
+            this.cursorProperties = Collections.unmodifiableMap(newProperties);
+            updateCursorPropertiesResult.complete(null);
+            return updateCursorPropertiesResult;
+        }
+
         ManagedCursorInfo copy = ManagedCursorInfo
                 .newBuilder(ManagedCursorImpl.this.managedCursorInfo)
                 .clearCursorProperties()
                 .addAllCursorProperties(buildStringPropertiesMap(newProperties))
                 .build();
-
+        final Stat lastCursorLedgerStat = ManagedCursorImpl.this.cursorLedgerStat;
         ledger.getStore().asyncUpdateCursorInfo(ledger.getName(),
                 name, copy, lastCursorLedgerStat, new MetaStoreCallback<>() {
                     @Override
@@ -981,6 +985,11 @@ public class ManagedCursorImpl implements ManagedCursor {
                 log.debug("[{}] [{}] Re-trying the read at position {}", ledger.getName(), name, op.readPosition);
             }
 
+            if (isClosed()) {
+                callback.readEntriesFailed(new CursorAlreadyClosedException("Cursor was already closed"), ctx);
+                return;
+            }
+
             if (!hasMoreEntries()) {
                 if (log.isDebugEnabled()) {
                     log.debug("[{}] [{}] Still no entries available. Register for notification", ledger.getName(),
@@ -1269,7 +1278,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         if (proposedReadPosition.equals(PositionImpl.EARLIEST)) {
             newReadPosition = ledger.getFirstPosition();
         } else if (proposedReadPosition.equals(PositionImpl.LATEST)) {
-            newReadPosition = ledger.getLastPosition().getNext();
+            newReadPosition = ledger.getNextValidPosition(ledger.getLastPosition());
         } else {
             newReadPosition = proposedReadPosition;
         }
@@ -2177,8 +2186,7 @@ public class ManagedCursorImpl implements ManagedCursor {
             if (ledger.isNoMessagesAfterPos(mdEntry.newPosition)) {
                 persistPositionToMetaStore(mdEntry, cb);
             } else {
-                mdEntry.callback.markDeleteFailed(new ManagedLedgerException("Create new cursor ledger failed"),
-                        mdEntry.ctx);
+                cb.operationFailed(new ManagedLedgerException("Switch new cursor ledger failed"));
             }
         } else {
             persistPositionToLedger(cursorLedger, mdEntry, cb);
@@ -2852,9 +2860,19 @@ public class ManagedCursorImpl implements ManagedCursor {
                 synchronized (pendingMarkDeleteOps) {
                     // At this point we don't have a ledger ready
                     STATE_UPDATER.set(ManagedCursorImpl.this, State.NoLedger);
-                    // Note: if the stat is NoLedger, will persist the mark deleted position to metadata store.
-                    // Before giving up, try to persist the position in the metadata store.
-                    flushPendingMarkDeletes();
+                    // There are two case may cause switch ledger fails.
+                    // 1. No enough BKs; BKs are in read-only mode...
+                    // 2. Write ZK fails.
+                    // Regarding the case "No enough BKs", try to persist the position in the metadata store before
+                    // giving up.
+                    if (!(exception instanceof MetaStoreException)) {
+                        flushPendingMarkDeletes();
+                    } else {
+                        while (!pendingMarkDeleteOps.isEmpty()) {
+                            MarkDeleteEntry entry = pendingMarkDeleteOps.poll();
+                            entry.callback.markDeleteFailed(exception, entry.ctx);
+                        }
+                    }
                 }
             }
         });

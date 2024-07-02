@@ -107,6 +107,7 @@ import org.apache.pulsar.broker.service.TransactionBufferSnapshotServiceFactory;
 import org.apache.pulsar.broker.service.schema.SchemaRegistryService;
 import org.apache.pulsar.broker.service.schema.SchemaStorageFactory;
 import org.apache.pulsar.broker.stats.MetricsGenerator;
+import org.apache.pulsar.broker.stats.prometheus.PrometheusMetricsServlet;
 import org.apache.pulsar.broker.stats.prometheus.PrometheusRawMetricsProvider;
 import org.apache.pulsar.broker.stats.prometheus.PulsarPrometheusMetricsServlet;
 import org.apache.pulsar.broker.storage.ManagedLedgerStorage;
@@ -383,7 +384,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
     }
 
     private void closeLeaderElectionService() throws Exception {
-        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(config)) {
+        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(this)) {
             ExtensibleLoadManagerImpl.get(loadManager.get()).getLeaderElectionService().close();
         } else {
             if (this.leaderElectionService != null) {
@@ -423,6 +424,9 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                 return closeFuture;
             }
             LOG.info("Closing PulsarService");
+            if (brokerService != null) {
+                brokerService.unloadNamespaceBundlesGracefully();
+            }
             state = State.Closing;
 
             // close the service in reverse order v.s. in which they are started
@@ -567,13 +571,12 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                 }
             }
 
-            closeLocalMetadataStore();
+            asyncCloseFutures.add(closeLocalMetadataStore());
+            if (configMetadataSynchronizer != null) {
+                asyncCloseFutures.add(configMetadataSynchronizer.closeAsync());
+            }
             if (configurationMetadataStore != null && shouldShutdownConfigurationMetadataStore) {
                 configurationMetadataStore.close();
-                if (configMetadataSynchronizer != null) {
-                    configMetadataSynchronizer.close();
-                    configMetadataSynchronizer = null;
-                }
             }
 
             if (transactionExecutorProvider != null) {
@@ -1013,7 +1016,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                 true, attributeMap, true, Topics.class);
 
         // Add metrics servlet
-        webService.addServlet("/metrics",
+        webService.addServlet(PrometheusMetricsServlet.DEFAULT_METRICS_PATH,
                 new ServletHolder(metricsServlet),
                 config.isAuthenticateMetricsEndpoint(), attributeMap);
 
@@ -1113,18 +1116,20 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                         .build());
     }
 
-    protected void closeLocalMetadataStore() throws Exception {
+    protected CompletableFuture<Void> closeLocalMetadataStore() throws Exception {
         if (localMetadataStore != null) {
             localMetadataStore.close();
         }
         if (localMetadataSynchronizer != null) {
-            localMetadataSynchronizer.close();
+            CompletableFuture<Void> closeSynchronizer = localMetadataSynchronizer.closeAsync();
             localMetadataSynchronizer = null;
+            return closeSynchronizer;
         }
+        return CompletableFuture.completedFuture(null);
     }
 
     protected void startLeaderElectionService() {
-        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(config)) {
+        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(this)) {
             LOG.info("The load manager extension is enabled. Skipping PulsarService LeaderElectionService.");
             return;
         }
@@ -1239,7 +1244,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
         LOG.info("Starting load management service ...");
         this.loadManager.get().start();
 
-        if (config.isLoadBalancerEnabled() && !ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(config)) {
+        if (config.isLoadBalancerEnabled() && !ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(this)) {
             LOG.info("Starting load balancer");
             if (this.loadReportTask == null) {
                 long loadReportMinInterval = config.getLoadBalancerReportUpdateMinIntervalMillis();
@@ -1333,7 +1338,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
      * @return a reference of the current <code>LeaderElectionService</code> instance.
      */
     public LeaderElectionService getLeaderElectionService() {
-        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(config)) {
+        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(this)) {
             return ExtensibleLoadManagerImpl.get(loadManager.get()).getLeaderElectionService();
         } else {
             return this.leaderElectionService;
@@ -1933,5 +1938,70 @@ public class PulsarService implements AutoCloseable, ShutdownService {
     @VisibleForTesting
     protected BrokerService newBrokerService(PulsarService pulsar) throws Exception {
         return new BrokerService(pulsar, ioEventLoopGroup);
+    }
+
+    public void initConfigMetadataSynchronizerIfNeeded() {
+        mutex.lock();
+        try {
+            final String newTopic = config.getConfigurationMetadataSyncEventTopic();
+            final PulsarMetadataEventSynchronizer oldSynchronizer = configMetadataSynchronizer;
+            // Skip if not support.
+            if (!(configurationMetadataStore instanceof MetadataStoreExtended)) {
+                LOG.info(
+                        "Skip to update Metadata Synchronizer because of the Configuration Metadata Store using[{}]"
+                                + " does not support.", configurationMetadataStore.getClass().getName());
+                return;
+            }
+            // Skip if no changes.
+            //   case-1: both null.
+            //   case-2: both topics are the same.
+            if ((oldSynchronizer == null && StringUtils.isBlank(newTopic))) {
+                LOG.info("Skip to update Metadata Synchronizer because the topic[null] does not changed.");
+            }
+            if (StringUtils.isNotBlank(newTopic) && oldSynchronizer != null) {
+                TopicName newTopicName = TopicName.get(newTopic);
+                TopicName oldTopicName = TopicName.get(oldSynchronizer.getTopicName());
+                if (newTopicName.equals(oldTopicName)) {
+                    LOG.info("Skip to update Metadata Synchronizer because the topic[{}] does not changed.",
+                            oldTopicName);
+                }
+            }
+            // Update(null or not null).
+            //   1.set the new one.
+            //   2.close the old one.
+            //   3.async start the new one.
+            if (StringUtils.isBlank(newTopic)) {
+                configMetadataSynchronizer = null;
+            } else {
+                configMetadataSynchronizer = new PulsarMetadataEventSynchronizer(this, newTopic);
+            }
+            // close the old one and start the new one.
+            PulsarMetadataEventSynchronizer newSynchronizer = configMetadataSynchronizer;
+            MetadataStoreExtended metadataStoreExtended = (MetadataStoreExtended) configurationMetadataStore;
+            metadataStoreExtended.updateMetadataEventSynchronizer(newSynchronizer);
+            Runnable startNewSynchronizer = () -> {
+                if (newSynchronizer == null) {
+                    return;
+                }
+                try {
+                    newSynchronizer.start();
+                } catch (Exception e) {
+                    // It only occurs when get internal client fails.
+                    LOG.error("Start Metadata Synchronizer with topic {} failed.",
+                            newTopic, e);
+                }
+            };
+            executor.submit(() -> {
+                if (oldSynchronizer != null) {
+                    oldSynchronizer.closeAsync().whenComplete((ignore, ex) -> {
+                        startNewSynchronizer.run();
+                    });
+                } else {
+                    startNewSynchronizer.run();
+                }
+            });
+        } finally {
+            mutex.unlock();
+        }
     }
 }

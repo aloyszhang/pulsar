@@ -227,6 +227,7 @@ public class SnapshotSegmentAbortedTxnProcessorImpl implements AbortedTxnProcess
                 .createReader(TopicName.get(topic.getName())).thenComposeAsync(reader -> {
                     PositionImpl startReadCursorPosition = null;
                     TransactionBufferSnapshotIndexes persistentSnapshotIndexes = null;
+                    int count = 0;
                     try {
                         /*
                           Read the transaction snapshot segment index.
@@ -237,7 +238,9 @@ public class SnapshotSegmentAbortedTxnProcessorImpl implements AbortedTxnProcess
                               in segments to aborts.
                           </p>
                          */
+                        log.info("recoverFromSnapshot read start, topic :{}", topic.getName());
                         while (reader.hasMoreEvents()) {
+                            count++;
                             Message<TransactionBufferSnapshotIndexes> message = reader.readNextAsync()
                                     .get(getSystemClientOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             if (topic.getName().equals(message.getKey())) {
@@ -250,10 +253,12 @@ public class SnapshotSegmentAbortedTxnProcessorImpl implements AbortedTxnProcess
                                 }
                             }
                         }
+                        log.info("recoverFromSnapshot read end, topic :{}, eventCunt :{}", topic.getName(), count);
+
                     } catch (TimeoutException ex) {
                         Throwable t = FutureUtil.unwrapCompletionException(ex);
                         String errorMessage = String.format("[%s] Transaction buffer recover fail by read "
-                                + "transactionBufferSnapshot timeout!", topic.getName());
+                                + "transactionBufferSnapshot timeout! messageCount [%s]", topic.getName(), count);
                         log.error(errorMessage, t);
                         return FutureUtil.failedFuture(
                                 new BrokerServiceException.ServiceUnitNotReadyException(errorMessage, t));

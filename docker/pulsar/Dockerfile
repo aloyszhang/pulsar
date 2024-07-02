@@ -79,7 +79,7 @@ RUN mkdir -p /etc/apt/keyrings \
      && apt-get -y install temurin-17-jdk \
      && export ARCH=$(uname -m | sed -r 's/aarch64/arm64/g' |  awk '!/arm64/{$0="amd64"}1') \
      && echo networkaddress.cache.ttl=1 >> /usr/lib/jvm/temurin-17-jdk-$ARCH/conf/security/java.security \
-     && echo networkaddress.cache.negative.ttl=1 >> /usr/lib/jvm/temurin-17-jdk-$ARCH/conf/security/java.security \
+     && echo networkaddress.cache.negative.ttl=1 >> /usr/lib/jvm/temurin-17-jdk-$ARCH/conf/security/java.security
 
 # Cleanup apt
 RUN apt-get -y --purge autoremove \
@@ -110,5 +110,5 @@ RUN chmod +x /pulsar/bin/install-pulsar-client.sh
 RUN /pulsar/bin/install-pulsar-client.sh
 
 # The UID must be non-zero. Otherwise, it is arbitrary. No logic should rely on its specific value.
-RUN useradd ${DEFAULT_USERNAME} -u 10000 -g 0
+RUN useradd ${DEFAULT_USERNAME} -u 10000 -g 0 --no-create-home --home-dir /pulsar/data
 USER 10000

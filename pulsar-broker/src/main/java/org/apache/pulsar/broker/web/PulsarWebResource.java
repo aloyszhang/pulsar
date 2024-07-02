@@ -610,12 +610,17 @@ public abstract class PulsarWebResource {
         NamespaceBundle nsBundle = validateNamespaceBundleRange(fqnn, bundles, bundleRange);
         NamespaceService nsService = pulsar().getNamespaceService();
 
+        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(pulsar)) {
+            return nsService.checkOwnershipPresentAsync(nsBundle);
+        }
+
         LookupOptions options = LookupOptions.builder()
                 .authoritative(false)
                 .requestHttps(isRequestHttps())
                 .readOnly(true)
                 .loadTopicsInBundle(false).build();
-        return nsService.getWebServiceUrlAsync(nsBundle, options).thenApply(optionUrl -> optionUrl.isPresent());
+
+        return nsService.getWebServiceUrlAsync(nsBundle, options).thenApply(Optional::isPresent);
     }
 
     protected NamespaceBundle validateNamespaceBundleOwnership(NamespaceName fqnn, BundlesData bundles,
@@ -730,7 +735,7 @@ public abstract class PulsarWebResource {
                                             .host(webUrl.get().getHost())
                                             .port(webUrl.get().getPort())
                                             .replaceQueryParam("authoritative", newAuthoritative);
-                                    if (!ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(config())) {
+                                    if (!ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(pulsar)) {
                                         uriBuilder.replaceQueryParam("destinationBroker", null);
                                     }
                                     URI redirect = uriBuilder.build();
@@ -1005,7 +1010,7 @@ public abstract class PulsarWebResource {
 
     protected static boolean isLeaderBroker(PulsarService pulsar) {
         // For extensible load manager, it doesn't have leader election service on pulsar broker.
-        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(pulsar.getConfig())) {
+        if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(pulsar)) {
             return true;
         }
         return  pulsar.getLeaderElectionService().isLeader();

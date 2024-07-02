@@ -248,6 +248,22 @@ public class ServiceConfiguration implements PulsarConfiguration {
             doc = "Enable or disable the proxy protocol.")
     private boolean haProxyProtocolEnabled;
 
+    @FieldContext(category = CATEGORY_SERVER,
+            doc = "Enable or disable the use of HA proxy protocol for resolving the client IP for http/https "
+                    + "requests. Default is false.")
+    private boolean webServiceHaProxyProtocolEnabled = false;
+
+    @FieldContext(category = CATEGORY_SERVER, doc =
+            "Trust X-Forwarded-For header for resolving the client IP for http/https requests.\n"
+                    + "Default is false.")
+    private boolean webServiceTrustXForwardedFor = false;
+
+    @FieldContext(category = CATEGORY_SERVER, doc =
+            "Add detailed client/remote and server/local addresses and ports to http/https request logging.\n"
+                    + "Defaults to true when either webServiceHaProxyProtocolEnabled or webServiceTrustXForwardedFor "
+                    + "is enabled.")
+    private Boolean webServiceLogDetailedAddresses;
+
     @FieldContext(
             category = CATEGORY_SERVER,
             doc = "Number of threads to use for Netty Acceptor."
@@ -327,6 +343,19 @@ public class ServiceConfiguration implements PulsarConfiguration {
     @FieldContext(category = CATEGORY_SERVER, doc = "Maximum number of inbound http connections. "
             + "(0 to disable limiting)")
     private int maxHttpServerConnections = 2048;
+
+    @FieldContext(category = CATEGORY_SERVER, doc =
+            "Gzip compression is enabled by default. Specific paths can be excluded from compression.\n"
+                    + "There are 2 syntaxes supported, Servlet url-pattern based, and Regex based.\n"
+                    + "If the spec starts with '^' the spec is assumed to be a regex based path spec and will match "
+                    + "with normal Java regex rules.\n"
+                    + "If the spec starts with '/' then spec is assumed to be a Servlet url-pattern rules path spec "
+                    + "for either an exact match or prefix based match.\n"
+                    + "If the spec starts with '*.' then spec is assumed to be a Servlet url-pattern rules path spec "
+                    + "for a suffix based match.\n"
+                    + "All other syntaxes are unsupported.\n"
+                    + "Disable all compression with ^.* or ^.*$")
+    private List<String> httpServerGzipCompressionExcludedPaths = new ArrayList<>();
 
     @FieldContext(category = CATEGORY_SERVER, doc = "Whether to enable the delayed delivery for messages.")
     private boolean delayedDeliveryEnabled = true;
@@ -1360,7 +1389,8 @@ public class ServiceConfiguration implements PulsarConfiguration {
             category = CATEGORY_SERVER,
             dynamic = true,
             doc = "The number of partitions per partitioned topic.\n"
-                + "If try to create or update partitioned topics by exceeded number of partitions, then fail."
+                + "If try to create or update partitioned topics by exceeded number of partitions, then fail.\n"
+                + "Use 0 or negative number to disable the check."
     )
     private int maxNumPartitionsPerPartitionedTopic = 0;
 
@@ -1699,6 +1729,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
         category = CATEGORY_STORAGE_BK,
         doc = "Parameters for bookkeeper auth plugin"
     )
+    @ToString.Exclude
     private String bookkeeperClientAuthenticationParameters;
 
     @FieldContext(
@@ -2830,6 +2861,13 @@ public class ServiceConfiguration implements PulsarConfiguration {
         doc = "Number of connections per Broker in Pulsar Client used in WebSocket proxy"
     )
     private int webSocketConnectionsPerBroker = Runtime.getRuntime().availableProcessors();
+
+    @FieldContext(
+            category = CATEGORY_WEBSOCKET,
+            doc = "Memory limit in MBs for direct memory in Pulsar Client used in WebSocket proxy"
+    )
+    private int webSocketPulsarClientMemoryLimitInMB = 0;
+
     @FieldContext(
         category = CATEGORY_WEBSOCKET,
         doc = "Time in milliseconds that idle WebSocket session times out"
@@ -2862,8 +2900,10 @@ public class ServiceConfiguration implements PulsarConfiguration {
     private boolean exposeTopicLevelMetricsInPrometheus = true;
     @FieldContext(
             category = CATEGORY_METRICS,
-            doc = "If true, export buffered metrics"
-    )
+            doc = "Set to true to enable the broker to cache the metrics response; the default is false. "
+                    + "The caching period is defined by `managedLedgerStatsPeriodSeconds`. "
+                    + "The broker returns the same response for subsequent requests within the same period. "
+                    + "Ensure that the scrape interval of your monitoring system matches the caching period.")
     private boolean metricsBufferResponse = false;
     @FieldContext(
         category = CATEGORY_METRICS,
@@ -3251,6 +3291,7 @@ public class ServiceConfiguration implements PulsarConfiguration {
             doc = "Authentication parameters of the authentication plugin the broker is using to connect "
                     + "to other brokers"
     )
+    @ToString.Exclude
     private String brokerClientAuthenticationParameters = "";
     @FieldContext(
             category = CATEGORY_REPLICATION,

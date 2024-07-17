@@ -78,7 +78,7 @@ public class BaseResources<T> {
         return cache.getChildren(path);
     }
 
-    protected Optional<T> get(String path) throws MetadataStoreException {
+    public Optional<T> get(String path) throws MetadataStoreException {
         try {
             return getAsync(path).get(operationTimeoutSec, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
@@ -89,7 +89,7 @@ public class BaseResources<T> {
         }
     }
 
-    protected CompletableFuture<Optional<T>> getAsync(String path) {
+    public CompletableFuture<Optional<T>> getAsync(String path) {
         return cache.get(path);
     }
 

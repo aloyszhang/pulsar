@@ -45,7 +45,7 @@
 PULSAR_MEM=${PULSAR_MEM:-"-Xms2g -Xmx2g -XX:MaxDirectMemorySize=4g"}
 
 # Garbage collection options
-PULSAR_GC=${PULSAR_GC:-"-XX:+UseZGC -XX:+PerfDisableSharedMem -XX:+AlwaysPreTouch"}
+PULSAR_GC=${PULSAR_GC:-"-XX:+UseZGC -XX:+AlwaysPreTouch"}
 
 if [ -z "$JAVA_HOME" ]; then
   JAVA_BIN=java

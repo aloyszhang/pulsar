@@ -511,6 +511,28 @@ public class PersistentTopics extends PersistentTopicsBase {
         }
     }
 
+    @GET
+    @Path("{property}/{cluster}/{namespace}/{topic}/partitioned-stats")
+    @ApiOperation(hidden = true, value = "Get the stats for the partitioned topic.")
+    @ApiResponses(value = {
+            @ApiResponse(code = 307, message = "Current broker doesn't serve the namespace of this topic"),
+            @ApiResponse(code = 403, message = "Don't have admin permission"),
+            @ApiResponse(code = 404, message = "Namespace or topic does not exist")})
+    public void getOverviewStats(@Suspended final AsyncResponse asyncResponse,
+                                    @PathParam("property") String property,
+                                    @PathParam("cluster") String cluster, @PathParam("namespace") String namespace,
+                                    @PathParam("topic") @Encoded String encodedTopic,
+                                    @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        try {
+            validateTopicName(property, cluster, namespace, encodedTopic);
+            internalGetPartitionedStats(asyncResponse, authoritative, perPartition, false, false, false);
+        } catch (WebApplicationException wae) {
+            asyncResponse.resume(wae);
+        } catch (Exception e) {
+            asyncResponse.resume(new RestException(e));
+        }
+    }
+
 
     @GET
     @Path("{property}/{cluster}/{namespace}/{topic}/partitioned-internalStats")

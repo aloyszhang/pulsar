@@ -284,6 +284,13 @@ public interface Topic {
     CompletableFuture<? extends TopicStatsImpl> asyncGetStats(boolean getPreciseBacklog,
                                                               boolean subscriptionBacklogSize,
                                                               boolean getEarliestTimeInBacklog);
+    default CompletableFuture<? extends TopicStatsImpl> asyncGetOverviewStats(){
+        throw new UnsupportedOperationException("asyncGetOverviewStats is not supported by default");
+    }
+
+    default CompletableFuture<? extends TopicStatsImpl> asyncGetConsumerDetail(List<String> consumers){
+        throw new UnsupportedOperationException("asyncGetConsumerDetail is not supported by default");
+    }
 
     CompletableFuture<PersistentTopicInternalStats> getInternalStats(boolean includeLedgerMetadata);
 

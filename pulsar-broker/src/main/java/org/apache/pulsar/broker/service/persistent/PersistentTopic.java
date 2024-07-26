@@ -2465,6 +2465,59 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
         return statsFuture;
     }
 
+    @Override
+    public CompletableFuture<? extends TopicStatsImpl> asyncGetOverviewStats() {
+        CompletableFuture<TopicStatsImpl> statsFuture = new CompletableFuture<>();
+        TopicStatsImpl stats = new TopicStatsImpl();
+
+        producers.values().forEach(producer -> {
+            PublisherStatsImpl publisherStats = producer.getStats();
+            stats.msgRateIn += publisherStats.msgRateIn;
+            stats.msgThroughputIn += publisherStats.msgThroughputIn;
+        });
+
+        subscriptions.forEach((name, subscription) -> {
+            SubscriptionStatsImpl subStats = subscription.getStats(false, false, false);
+            stats.msgRateOut += subStats.msgRateOut;
+            stats.msgThroughputOut += subStats.msgThroughputOut;
+        });
+
+        statsFuture.complete(stats);
+
+        return statsFuture;
+    }
+    @Override
+    public CompletableFuture<? extends TopicStatsImpl> asyncGetConsumerDetail(List<String> consumers) {
+        CompletableFuture<TopicStatsImpl> statsFuture = new CompletableFuture<>();
+        TopicStatsImpl stats = new TopicStatsImpl();
+
+        for (String name : consumers) {
+            PersistentSubscription subscription = subscriptions.get(name);
+            SubscriptionStatsImpl subStats = subscription.getStats(false, false, false);
+            stats.msgRateOut += subStats.msgRateOut;
+            stats.msgThroughputOut += subStats.msgThroughputOut;
+            stats.bytesOutCounter += subStats.bytesOutCounter;
+            stats.msgOutCounter += subStats.msgOutCounter;
+            stats.subscriptions.put(name, subStats);
+            stats.nonContiguousDeletedMessagesRanges += subStats.nonContiguousDeletedMessagesRanges;
+            stats.nonContiguousDeletedMessagesRangesSerializedSize +=
+                    subStats.nonContiguousDeletedMessagesRangesSerializedSize;
+            stats.delayedMessageIndexSizeInBytes += subStats.delayedMessageIndexSizeInBytes;
+
+            subStats.bucketDelayedIndexStats.forEach((k, v) -> {
+                TopicMetricBean topicMetricBean =
+                        stats.bucketDelayedIndexStats.computeIfAbsent(k, __ -> new TopicMetricBean());
+                topicMetricBean.name = v.name;
+                topicMetricBean.labelsAndValues = v.labelsAndValues;
+                topicMetricBean.value += v.value;
+            });
+        }
+
+        statsFuture.complete(stats);
+
+        return statsFuture;
+    }
+
     private Optional<CompactorMXBean> getCompactorMXBean() {
         Compactor compactor = brokerService.pulsar().getNullableCompactor();
         return Optional.ofNullable(compactor).map(c -> c.getStats());

@@ -22,6 +22,7 @@ import io.netty.buffer.ByteBuf;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.mledger.Position;
@@ -288,8 +289,16 @@ public interface Topic {
         throw new UnsupportedOperationException("asyncGetOverviewStats is not supported by default");
     }
 
-    default CompletableFuture<? extends TopicStatsImpl> asyncGetConsumerDetail(List<String> consumers){
-        throw new UnsupportedOperationException("asyncGetConsumerDetail is not supported by default");
+    default TopicStatsImpl getOverviewStats(){
+        throw new UnsupportedOperationException("asyncGetOverviewStats is not supported by default");
+    }
+
+    default TopicStatsImpl getSubscriptionStats(Set<String> subscriptions){
+        throw new UnsupportedOperationException("getSubscriptionStats is not supported by default");
+    }
+
+    default CompletableFuture<? extends TopicStatsImpl> asyncGetSubscriptionStats(Set<String> subscriptions){
+        throw new UnsupportedOperationException("asyncGetSubscriptionStats is not supported by default");
     }
 
     CompletableFuture<PersistentTopicInternalStats> getInternalStats(boolean includeLedgerMetadata);

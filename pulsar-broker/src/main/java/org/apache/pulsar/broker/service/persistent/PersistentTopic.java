@@ -2487,12 +2487,32 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
         return statsFuture;
     }
     @Override
-    public CompletableFuture<? extends TopicStatsImpl> asyncGetConsumerDetail(List<String> consumers) {
+    public TopicStatsImpl getOverviewStats() {
+        try {
+            return asyncGetOverviewStats().get();
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("[{}] Fail to get stats", topic, e);
+            return null;
+        }
+    }
+
+    @Override
+    public TopicStatsImpl getSubscriptionStats(Set<String> subscriptions) {
+        try {
+            return asyncGetSubscriptionStats(subscriptions).get();
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("[{}] Fail to get stats", topic, e);
+            return null;
+        }
+    }
+
+    @Override
+    public CompletableFuture<? extends TopicStatsImpl> asyncGetSubscriptionStats(Set<String> subscriptions) {
         CompletableFuture<TopicStatsImpl> statsFuture = new CompletableFuture<>();
         TopicStatsImpl stats = new TopicStatsImpl();
 
-        for (String name : consumers) {
-            PersistentSubscription subscription = subscriptions.get(name);
+        for (String name : subscriptions) {
+            PersistentSubscription subscription = this.subscriptions.get(name);
             SubscriptionStatsImpl subStats = subscription.getStats(false, false, false);
             stats.msgRateOut += subStats.msgRateOut;
             stats.msgThroughputOut += subStats.msgThroughputOut;

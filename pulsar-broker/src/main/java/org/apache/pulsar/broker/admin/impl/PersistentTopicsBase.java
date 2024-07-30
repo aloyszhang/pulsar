@@ -1645,7 +1645,9 @@ public class PersistentTopicsBase extends AdminResource {
                     statFuture = topicStatsFutureList.get(i);
                     if (statFuture.isDone() && !statFuture.isCompletedExceptionally()) {
                         try {
-                            stats.add(statFuture.get());
+                            TopicStats ts = statFuture.get();
+                            stats.add(ts);
+                            stats.partitions.put(topicName.getPartition(i).toString(), ts);
                         } catch (Exception e) {
                             asyncResponse.resume(new RestException(e));
                             return null;

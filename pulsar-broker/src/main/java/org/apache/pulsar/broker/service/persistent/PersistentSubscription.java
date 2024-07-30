@@ -1242,6 +1242,16 @@ public class PersistentSubscription extends AbstractSubscription implements Subs
         return subStats;
     }
 
+    public SubscriptionStatsImpl getOverviewStats() {
+        SubscriptionStatsImpl subStats = new SubscriptionStatsImpl();
+        subStats.bytesOutCounter = bytesOutFromRemovedConsumers.longValue();
+        subStats.msgOutCounter = msgOutFromRemovedConsumer.longValue();
+        subStats.msgBacklog = getNumberOfEntriesInBacklog(false);
+        subStats.msgBacklogNoDelayed = subStats.msgBacklog - subStats.msgDelayed;
+        subStats.msgRateExpired = expiryMonitor.getMessageExpiryRate();
+        return subStats;
+    }
+
     @Override
     public void redeliverUnacknowledgedMessages(Consumer consumer, long consumerEpoch) {
         Dispatcher dispatcher = getDispatcher();

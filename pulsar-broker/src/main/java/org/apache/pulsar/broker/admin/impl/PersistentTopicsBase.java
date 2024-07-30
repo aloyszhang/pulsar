@@ -1665,7 +1665,7 @@ public class PersistentTopicsBase extends AdminResource {
         });
     }
 
-    protected void internalGetPartitionedSubscriptionStats(AsyncResponse asyncResponse, Set<String> consumers,
+    protected void internalGetPartitionedSubscriptionStats(AsyncResponse asyncResponse, Set<String> subscriptions,
                                                            boolean authoritative) {
         CompletableFuture<Void> future = validateTopicOperationAsync(topicName, TopicOperation.GET_STATS);
         future.thenCompose(__ -> {
@@ -1690,12 +1690,11 @@ public class PersistentTopicsBase extends AdminResource {
                                 .thenCompose(owned -> {
                                     if (owned) {
                                         return getTopicReferenceAsync(partition)
-                                                .thenApply(ref -> ref.getSubscriptionStats(consumers));
+                                                .thenApply(ref -> ref.getSubscriptionStats(subscriptions));
                                     } else {
                                         try {
-                                            // todo
-                                            return pulsar().getAdminClient().topics().getOverviewStatsAsync(
-                                                    partition.toString());
+                                            return pulsar().getAdminClient().topics().getSubscriptionStatsAsync(
+                                                    partition.toString(), subscriptions);
                                         } catch (PulsarServerException e) {
                                             return FutureUtil.failedFuture(e);
                                         }

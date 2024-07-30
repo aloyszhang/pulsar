@@ -2469,6 +2469,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
     public CompletableFuture<? extends TopicStatsImpl> asyncGetOverviewStats() {
         CompletableFuture<TopicStatsImpl> statsFuture = new CompletableFuture<>();
         TopicStatsImpl stats = new TopicStatsImpl();
+        stats.storageSize = ledger.getTotalSize();
 
         producers.values().forEach(producer -> {
             PublisherStatsImpl publisherStats = producer.getStats();

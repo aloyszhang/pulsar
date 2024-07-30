@@ -685,6 +685,117 @@ public class TopicsImpl extends BaseResource implements Topics {
     }
 
     @Override
+    public TopicStats getOverviewStats(String topic) throws PulsarAdminException {
+        return sync(() -> getOverviewStatsAsync(topic));
+    }
+
+    @Override
+    public CompletableFuture<TopicStats> getOverviewStatsAsync(String topic) {
+        TopicName tn = validateTopic(topic);
+        WebTarget path = topicPath(tn, "overview-stats");
+        final CompletableFuture<TopicStats> future = new CompletableFuture<>();
+
+        InvocationCallback<TopicStats> persistentCB = new InvocationCallback<TopicStats>() {
+            @Override
+            public void completed(TopicStats response) {
+                future.complete(response);
+            }
+
+            @Override
+            public void failed(Throwable throwable) {
+                future.completeExceptionally(getApiException(throwable.getCause()));
+            }
+        };
+
+        asyncGetRequest(path, persistentCB);
+        return future;
+    }
+
+    @Override
+    public PartitionedTopicStats getPartitionedOverviewStats(String topic) throws PulsarAdminException {
+        return sync(() -> getPartitionedOverviewStatsAsync(topic));
+    }
+
+    @Override
+    public CompletableFuture<PartitionedTopicStats> getPartitionedOverviewStatsAsync(String topic) {
+        TopicName tn = validateTopic(topic);
+        WebTarget path = topicPath(tn, "partitioned-overview-stats");
+        final CompletableFuture<PartitionedTopicStats> future = new CompletableFuture<>();
+
+        InvocationCallback<PartitionedTopicStats> persistentCB = new InvocationCallback<PartitionedTopicStats>() {
+            @Override
+            public void completed(PartitionedTopicStats response) {
+                future.complete(response);
+            }
+
+            @Override
+            public void failed(Throwable throwable) {
+                future.completeExceptionally(getApiException(throwable.getCause()));
+            }
+        };
+
+        asyncGetRequest(path, persistentCB);
+        return future;
+    }
+
+    @Override
+    public TopicStats getSubscriptionStats(String topic, Set<String> subscriptions) throws PulsarAdminException {
+        return sync(() -> getSubscriptionStatsAsync(topic, subscriptions));
+    }
+
+    @Override
+    public CompletableFuture<TopicStats> getSubscriptionStatsAsync(String topic, Set<String> subscriptions) {
+        TopicName tn = validateTopic(topic);
+        WebTarget path = topicPath(tn, "subscription-stats");
+        final CompletableFuture<TopicStats> future = new CompletableFuture<>();
+
+        InvocationCallback<TopicStats> persistentCB = new InvocationCallback<TopicStats>() {
+            @Override
+            public void completed(TopicStats response) {
+                future.complete(response);
+            }
+
+            @Override
+            public void failed(Throwable throwable) {
+                future.completeExceptionally(getApiException(throwable.getCause()));
+            }
+        };
+
+        asyncGetRequest(path, persistentCB);
+        return future;
+    }
+
+    @Override
+    public PartitionedTopicStats getPartitionedSubscriptionStats(String topic, Set<String> subscriptions)
+            throws PulsarAdminException {
+        return sync(() -> getPartitionedSubscriptionStatsAsync(topic, subscriptions));
+    }
+
+    @Override
+    public CompletableFuture<PartitionedTopicStats> getPartitionedSubscriptionStatsAsync(String topic, Set<String> subscriptions) {
+        TopicName tn = validateTopic(topic);
+        WebTarget path = topicPath(tn, "partitioned-subscription-stats")
+                .queryParam("subscriptions", subscriptions.toArray());
+        final CompletableFuture<PartitionedTopicStats> future = new CompletableFuture<>();
+
+        InvocationCallback<PartitionedTopicStats> persistentCB = new InvocationCallback<PartitionedTopicStats>() {
+            @Override
+            public void completed(PartitionedTopicStats response) {
+                future.complete(response);
+            }
+
+            @Override
+            public void failed(Throwable throwable) {
+                future.completeExceptionally(getApiException(throwable.getCause()));
+            }
+        };
+
+        asyncGetRequest(path, persistentCB);
+
+        return future;
+    }
+
+    @Override
     public CompletableFuture<PartitionedTopicStats> getPartitionedStatsAsync(String topic,
             boolean perPartition, boolean getPreciseBacklog, boolean subscriptionBacklogSize,
                                                                              boolean getEarliestTimeInBacklog) {

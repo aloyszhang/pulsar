@@ -2465,6 +2465,64 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
         return statsFuture;
     }
 
+    @Override
+    public CompletableFuture<? extends TopicStatsImpl> asyncGetOverviewStats() {
+        CompletableFuture<TopicStatsImpl> statsFuture = new CompletableFuture<>();
+        TopicStatsImpl stats = new TopicStatsImpl();
+        stats.storageSize = ledger.getTotalSize();
+
+        producers.values().forEach(producer -> {
+            PublisherStatsImpl publisherStats = producer.getStats();
+            stats.msgRateIn += publisherStats.msgRateIn;
+            stats.msgThroughputIn += publisherStats.msgThroughputIn;
+        });
+
+        subscriptions.forEach((name, subscription) -> {
+            SubscriptionStatsImpl subStats = subscription.getStats(false, false, false);
+            stats.msgRateOut += subStats.msgRateOut;
+            stats.msgThroughputOut += subStats.msgThroughputOut;
+        });
+
+        statsFuture.complete(stats);
+
+        return statsFuture;
+    }
+    @Override
+    public TopicStatsImpl getOverviewStats() {
+        try {
+            return asyncGetOverviewStats().get();
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("[{}] Fail to get stats", topic, e);
+            return null;
+        }
+    }
+
+    @Override
+    public TopicStatsImpl getSubscriptionStats(Set<String> subscriptions) {
+        try {
+            return asyncGetSubscriptionStats(subscriptions).get();
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("[{}] Fail to get stats", topic, e);
+            return null;
+        }
+    }
+
+    @Override
+    public CompletableFuture<? extends TopicStatsImpl> asyncGetSubscriptionStats(Set<String> subscriptions) {
+        CompletableFuture<TopicStatsImpl> statsFuture = new CompletableFuture<>();
+        TopicStatsImpl stats = new TopicStatsImpl();
+
+        for (String name : subscriptions) {
+            PersistentSubscription subscription = this.subscriptions.get(name);
+            SubscriptionStatsImpl subStats = subscription.getOverviewStats();
+            stats.subscriptions.put(name, subStats);
+        }
+
+        statsFuture.complete(stats);
+
+        return statsFuture;
+    }
+
     private Optional<CompactorMXBean> getCompactorMXBean() {
         Compactor compactor = brokerService.pulsar().getNullableCompactor();
         return Optional.ofNullable(compactor).map(c -> c.getStats());

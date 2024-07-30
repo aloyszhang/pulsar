@@ -1354,6 +1354,37 @@ public class PersistentTopicsBase extends AdminResource {
                         getEarliestTimeInBacklog));
     }
 
+    protected CompletableFuture<? extends TopicStats> internalGetOverviewStatsAsync(boolean authoritative) {
+        CompletableFuture<Void> future;
+
+        if (topicName.isGlobal()) {
+            future = validateGlobalNamespaceOwnershipAsync(namespaceName);
+        } else {
+            future = CompletableFuture.completedFuture(null);
+        }
+
+        return future.thenCompose(__ -> validateTopicOwnershipAsync(topicName, authoritative))
+                .thenComposeAsync(__ -> validateTopicOperationAsync(topicName, TopicOperation.GET_STATS))
+                .thenCompose(__ -> getTopicReferenceAsync(topicName))
+                .thenCompose(topic -> topic.asyncGetOverviewStats());
+    }
+
+    protected CompletableFuture<? extends TopicStats> internalGetSubscriptionStatsAsync(Set<String> subscriptions,
+                                                                                        boolean authoritative) {
+        CompletableFuture<Void> future;
+
+        if (topicName.isGlobal()) {
+            future = validateGlobalNamespaceOwnershipAsync(namespaceName);
+        } else {
+            future = CompletableFuture.completedFuture(null);
+        }
+
+        return future.thenCompose(__ -> validateTopicOwnershipAsync(topicName, authoritative))
+                .thenComposeAsync(__ -> validateTopicOperationAsync(topicName, TopicOperation.GET_STATS))
+                .thenCompose(__ -> getTopicReferenceAsync(topicName))
+                .thenCompose(topic -> topic.asyncGetSubscriptionStats(subscriptions));
+    }
+
     protected CompletableFuture<PersistentTopicInternalStats> internalGetInternalStatsAsync(boolean authoritative,
                                                                                             boolean metadata) {
         CompletableFuture<Void> ret;
@@ -1504,24 +1535,24 @@ public class PersistentTopicsBase extends AdminResource {
             for (int i = 0; i < partitionMetadata.partitions; i++) {
                 TopicName partition = topicName.getPartition(i);
                 topicStatsFutureList.add(
-                    pulsar().getNamespaceService()
-                        .isServiceUnitOwnedAsync(partition)
-                        .thenCompose(owned -> {
-                            if (owned) {
-                                return getTopicReferenceAsync(partition)
-                                    .thenApply(ref ->
-                                        ref.getStats(getPreciseBacklog, subscriptionBacklogSize,
-                                            getEarliestTimeInBacklog));
-                            } else {
-                                try {
-                                    return pulsar().getAdminClient().topics().getStatsAsync(
-                                        partition.toString(), getPreciseBacklog, subscriptionBacklogSize,
-                                        getEarliestTimeInBacklog);
-                                } catch (PulsarServerException e) {
-                                    return FutureUtil.failedFuture(e);
-                                }
-                            }
-                        })
+                        pulsar().getNamespaceService()
+                                .isServiceUnitOwnedAsync(partition)
+                                .thenCompose(owned -> {
+                                    if (owned) {
+                                        return getTopicReferenceAsync(partition)
+                                                .thenApply(ref ->
+                                                        ref.getStats(getPreciseBacklog, subscriptionBacklogSize,
+                                                                getEarliestTimeInBacklog));
+                                    } else {
+                                        try {
+                                            return pulsar().getAdminClient().topics().getStatsAsync(
+                                                    partition.toString(), getPreciseBacklog, subscriptionBacklogSize,
+                                                    getEarliestTimeInBacklog);
+                                        } catch (PulsarServerException e) {
+                                            return FutureUtil.failedFuture(e);
+                                        }
+                                    }
+                                })
                 );
             }
 
@@ -1556,6 +1587,135 @@ public class PersistentTopicsBase extends AdminResource {
                     } catch (Exception e) {
                         asyncResponse.resume(new RestException(e));
                         return null;
+                    }
+                }
+                asyncResponse.resume(stats);
+                return null;
+            });
+        }).exceptionally(ex -> {
+            // If the exception is not redirect exception we need to log it.
+            if (isNot307And404Exception(ex)) {
+                log.error("[{}] Failed to get partitioned internal stats for {}", clientAppId(), topicName, ex);
+            }
+            resumeAsyncResponseExceptionally(asyncResponse, ex);
+            return null;
+        });
+    }
+
+    protected void internalGetPartitionedOverviewStats(AsyncResponse asyncResponse, boolean authoritative) {
+        CompletableFuture<Void> future = validateTopicOperationAsync(topicName, TopicOperation.GET_STATS);
+        future.thenCompose(__ -> {
+            if (topicName.isGlobal()) {
+                return validateGlobalNamespaceOwnershipAsync(namespaceName);
+            }
+            return  CompletableFuture.completedFuture(null);
+        }).thenCompose(__ -> getPartitionedTopicMetadataAsync(topicName,
+                authoritative, false)).thenAccept(partitionMetadata -> {
+            if (partitionMetadata.partitions == 0) {
+                asyncResponse.resume(new RestException(Status.NOT_FOUND,
+                        getPartitionedTopicNotFoundErrorMessage(topicName.toString())));
+                return;
+            }
+            PartitionedTopicStatsImpl stats = new PartitionedTopicStatsImpl(partitionMetadata);
+            List<CompletableFuture<TopicStats>> topicStatsFutureList = new ArrayList<>(partitionMetadata.partitions);
+            for (int i = 0; i < partitionMetadata.partitions; i++) {
+                TopicName partition = topicName.getPartition(i);
+                topicStatsFutureList.add(
+                    pulsar().getNamespaceService()
+                        .isServiceUnitOwnedAsync(partition)
+                        .thenCompose(owned -> {
+                            if (owned) {
+                                return getTopicReferenceAsync(partition)
+                                        .thenApply(ref -> ref.getOverviewStats());
+                            } else {
+                                try {
+                                    return pulsar().getAdminClient().topics().getOverviewStatsAsync(
+                                        partition.toString());
+                                } catch (PulsarServerException e) {
+                                    return FutureUtil.failedFuture(e);
+                                }
+                            }
+                        })
+                );
+            }
+
+            FutureUtil.waitForAll(topicStatsFutureList).handle((result, exception) -> {
+                CompletableFuture<TopicStats> statFuture = null;
+                for (int i = 0; i < topicStatsFutureList.size(); i++) {
+                    statFuture = topicStatsFutureList.get(i);
+                    if (statFuture.isDone() && !statFuture.isCompletedExceptionally()) {
+                        try {
+                            TopicStats ts = statFuture.get();
+                            stats.add(ts);
+                            stats.partitions.put(topicName.getPartition(i).toString(), ts);
+                        } catch (Exception e) {
+                            asyncResponse.resume(new RestException(e));
+                            return null;
+                        }
+                    }
+                }
+                asyncResponse.resume(stats);
+                return null;
+            });
+        }).exceptionally(ex -> {
+            // If the exception is not redirect exception we need to log it.
+            if (isNot307And404Exception(ex)) {
+                log.error("[{}] Failed to get partitioned internal stats for {}", clientAppId(), topicName, ex);
+            }
+            resumeAsyncResponseExceptionally(asyncResponse, ex);
+            return null;
+        });
+    }
+
+    protected void internalGetPartitionedSubscriptionStats(AsyncResponse asyncResponse, Set<String> subscriptions,
+                                                           boolean authoritative) {
+        CompletableFuture<Void> future = validateTopicOperationAsync(topicName, TopicOperation.GET_STATS);
+        future.thenCompose(__ -> {
+            if (topicName.isGlobal()) {
+                return validateGlobalNamespaceOwnershipAsync(namespaceName);
+            }
+            return  CompletableFuture.completedFuture(null);
+        }).thenCompose(__ -> getPartitionedTopicMetadataAsync(topicName,
+                authoritative, false)).thenAccept(partitionMetadata -> {
+            if (partitionMetadata.partitions == 0) {
+                asyncResponse.resume(new RestException(Status.NOT_FOUND,
+                        getPartitionedTopicNotFoundErrorMessage(topicName.toString())));
+                return;
+            }
+            PartitionedTopicStatsImpl stats = new PartitionedTopicStatsImpl(partitionMetadata);
+            List<CompletableFuture<TopicStats>> topicStatsFutureList = new ArrayList<>(partitionMetadata.partitions);
+            for (int i = 0; i < partitionMetadata.partitions; i++) {
+                TopicName partition = topicName.getPartition(i);
+                topicStatsFutureList.add(
+                        pulsar().getNamespaceService()
+                                .isServiceUnitOwnedAsync(partition)
+                                .thenCompose(owned -> {
+                                    if (owned) {
+                                        return getTopicReferenceAsync(partition)
+                                                .thenApply(ref -> ref.getSubscriptionStats(subscriptions));
+                                    } else {
+                                        try {
+                                            return pulsar().getAdminClient().topics().getSubscriptionStatsAsync(
+                                                    partition.toString(), subscriptions);
+                                        } catch (PulsarServerException e) {
+                                            return FutureUtil.failedFuture(e);
+                                        }
+                                    }
+                                })
+                );
+            }
+
+            FutureUtil.waitForAll(topicStatsFutureList).handle((result, exception) -> {
+                CompletableFuture<TopicStats> statFuture = null;
+                for (int i = 0; i < topicStatsFutureList.size(); i++) {
+                    statFuture = topicStatsFutureList.get(i);
+                    if (statFuture.isDone() && !statFuture.isCompletedExceptionally()) {
+                        try {
+                            stats.add(statFuture.get());
+                        } catch (Exception e) {
+                            asyncResponse.resume(new RestException(e));
+                            return null;
+                        }
                     }
                 }
                 asyncResponse.resume(stats);

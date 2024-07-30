@@ -1350,6 +1350,40 @@ public interface Topics {
         return getPartitionedStats(topic, perPartition, false, false, false);
     }
 
+    default TopicStats getOverviewStats(String topic) throws PulsarAdminException {
+        throw new UnsupportedOperationException("asyncGetOverviewStats is not supported by default");
+    }
+
+    default CompletableFuture<TopicStats> getOverviewStatsAsync(String topic) {
+        throw new UnsupportedOperationException("asyncGetOverviewStats is not supported by default");
+    }
+
+    default PartitionedTopicStats getPartitionedOverviewStats(String topic) throws PulsarAdminException {
+        throw new UnsupportedOperationException("getPartitionedOverviewStats is not supported by default");
+    }
+
+    default CompletableFuture<PartitionedTopicStats> getPartitionedOverviewStatsAsync(String topic) {
+        throw new UnsupportedOperationException("getPartitionedOverviewStatsAsync is not supported by default");
+    }
+
+    default TopicStats getSubscriptionStats(String topic, Set<String> subscriptions) throws PulsarAdminException {
+        throw new UnsupportedOperationException("getSubscriptionStats is not supported by default");
+    }
+
+    default CompletableFuture<TopicStats> getSubscriptionStatsAsync(String topic, Set<String> subscriptions) {
+        throw new UnsupportedOperationException("getSubscriptionStatsAsync is not supported by default");
+    }
+
+    default PartitionedTopicStats getPartitionedSubscriptionStats(String topic, Set<String> subscriptions)
+            throws PulsarAdminException {
+        throw new UnsupportedOperationException("getPartitionedSubscriptionStats is not supported by default");
+    }
+
+    default CompletableFuture<PartitionedTopicStats> getPartitionedSubscriptionStatsAsync(String topic,
+                                                                                      Set<String> subscriptions) {
+        throw new UnsupportedOperationException("getPartitionedSubscriptionStatsAsync is not supported by default");
+    }
+
     /**
      * Get the stats for the partitioned topic asynchronously.
      *

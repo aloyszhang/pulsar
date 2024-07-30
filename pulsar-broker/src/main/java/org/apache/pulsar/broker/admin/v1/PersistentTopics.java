@@ -511,7 +511,6 @@ public class PersistentTopics extends PersistentTopicsBase {
         }
     }
 
-
     @GET
     @Path("{property}/{cluster}/{namespace}/{topic}/partitioned-internalStats")
     @ApiOperation(hidden = true, value = "Get the stats-internal for the partitioned topic.")

@@ -1249,6 +1249,17 @@ public class PersistentSubscription extends AbstractSubscription implements Subs
         subStats.msgBacklog = getNumberOfEntriesInBacklog(false);
         subStats.msgBacklogNoDelayed = subStats.msgBacklog - subStats.msgDelayed;
         subStats.msgRateExpired = expiryMonitor.getMessageExpiryRate();
+
+        Dispatcher dispatcher = this.dispatcher;
+        if (dispatcher != null) {
+            dispatcher.getConsumers().forEach(consumer -> {
+                ConsumerStatsImpl consumerStats = consumer.getStats();
+                subStats.msgRateOut += consumerStats.msgRateOut;
+                subStats.msgThroughputOut += consumerStats.msgThroughputOut;
+                subStats.bytesOutCounter += consumerStats.bytesOutCounter;
+                subStats.msgOutCounter += consumerStats.msgOutCounter;
+            });
+        }
         return subStats;
     }
 

@@ -746,7 +746,8 @@ public class TopicsImpl extends BaseResource implements Topics {
     @Override
     public CompletableFuture<TopicStats> getSubscriptionStatsAsync(String topic, Set<String> subscriptions) {
         TopicName tn = validateTopic(topic);
-        WebTarget path = topicPath(tn, "subscription-stats");
+        WebTarget path = topicPath(tn, "subscription-stats")
+                .queryParam("subscriptions", subscriptions.toArray());
         final CompletableFuture<TopicStats> future = new CompletableFuture<>();
 
         InvocationCallback<TopicStats> persistentCB = new InvocationCallback<TopicStats>() {

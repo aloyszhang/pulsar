@@ -32,7 +32,7 @@
   <groupId>org.apache.pulsar</groupId>
   <artifactId>pulsar</artifactId>
 
-  <version>3.0.5.2</version>
+  <version>3.0.5.3</version>
 
   <name>Pulsar</name>
   <description>Pulsar is a distributed pub-sub messaging platform with a very
@@ -95,7 +95,7 @@ flexible messaging model and an intuitive client API.</description>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <project.build.outputTimestamp>2024-07-30T11:32:26Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2024-08-08T02:55:26Z</project.build.outputTimestamp>
     <redirectTestOutputToFile>true</redirectTestOutputToFile>
 
     <!-- By default build for local Docker platform.
@@ -2631,4 +2631,19 @@ flexible messaging model and an intuitive client API.</description>
       </snapshots>
     </repository>
   </repositories>
+
+  <distributionManagement>
+    <repository>
+      <id>mirrors-tencent</id>
+      <name>tencent public maven respository</name>
+      <url>https://mirrors.tencent.com/repository/maven/tencent_public/</url>
+    </repository>
+
+    <snapshotRepository>
+      <id>mirrors-tencent-snapshots</id>
+      <name>tencent public snapshots maven respository</name>
+      <url>https://mirrors.tencent.com/repository/maven/tencent_public_snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
+
 </project>

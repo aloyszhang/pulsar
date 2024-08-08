@@ -110,6 +110,9 @@ public class CmdTopics extends CmdBase {
         jcommander.addCommand("partitioned-stats", new GetPartitionedStats());
         jcommander.addCommand("partitioned-stats-internal", new GetPartitionedStatsInternal());
 
+        jcommander.addCommand("partitioned-subscription-stats", new getPartitionedSubscriptionStats());
+        jcommander.addCommand("subscription-stats", new getSubscriptionStats());
+
         jcommander.addCommand("skip", new Skip());
         jcommander.addCommand("clear-backlog", new ClearBacklog());
 
@@ -869,6 +872,40 @@ public class CmdTopics extends CmdBase {
             String topic = validateTopicName(params);
             print(getTopics().getPartitionedStats(topic, perPartition, getPreciseBacklog,
                     subscriptionBacklogSize, getEarliestTimeInBacklog));
+        }
+    }
+
+    @Parameters(commandDescription = "getPartitionedSubscriptionStats")
+    private class getPartitionedSubscriptionStats extends CliCommand {
+        @Parameter(description = "persistent://tenant/namespace/topic", required = true)
+        private java.util.List<String> params;
+
+        @Parameter(names = { "-s",
+                "--subscription" }, description = "Subscription to reset position on", required = true)
+        private String subscriptionName;
+
+        @Override
+        void run() throws Exception {
+            String topic = validateTopicName(params);
+            Set<String> collect = Arrays.stream(subscriptionName.split(",")).collect(Collectors.toSet());
+            print(getTopics().getPartitionedSubscriptionStats(topic, collect));
+        }
+    }
+
+    @Parameters(commandDescription = "getSubscriptionStats")
+    private class getSubscriptionStats extends CliCommand {
+        @Parameter(description = "persistent://tenant/namespace/topic", required = true)
+        private java.util.List<String> params;
+
+        @Parameter(names = { "-s",
+                "--subscription" }, description = "Subscription to reset position on", required = true)
+        private String subscriptionName;
+
+        @Override
+        void run() throws Exception {
+            String topic = validateTopicName(params);
+            Set<String> collect = Arrays.stream(subscriptionName.split(",")).collect(Collectors.toSet());
+            print(getTopics().getSubscriptionStats(topic, collect));
         }
     }
 

@@ -2514,8 +2514,10 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
 
         for (String name : subscriptions) {
             PersistentSubscription subscription = this.subscriptions.get(name);
-            SubscriptionStatsImpl subStats = subscription.getOverviewStats();
-            stats.subscriptions.put(name, subStats);
+            if (subscription != null) {
+                SubscriptionStatsImpl subStats = subscription.getOverviewStats();
+                stats.subscriptions.put(name, subStats);
+            }
         }
 
         statsFuture.complete(stats);

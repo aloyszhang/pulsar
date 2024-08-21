@@ -64,8 +64,8 @@ public class InLongMetricsManager {
     public static final long DEFAULT_MAX_METRICS_CACHE_SIZE = 512 * 1024 * 1024;
     // timeout for one-round flush task
     public static final long DEFAULT_CACHE_FLUSH_TIMEOUT_MILLIS = 50 * 1000;
-    public static final String DILIMITER_LOCAL_FILE = "#";
-    public static final String DILIMITER_NGCP = "|";
+    public static final String DELIMITER_LOCAL_FILE = "#";
+    public static final String DELIMITER_NGCP = "|";
     public static final String INVALID_KEY = "invalid_metric_key";
 
     private static final AtomicLong localFileCacheSizeCounter = new AtomicLong(0);
@@ -421,25 +421,17 @@ public class InLongMetricsManager {
             TopicName topicName = TopicName.get(topic);
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder
-                    .append(type).append(DILIMITER_LOCAL_FILE)
-                    .append(DILIMITER_LOCAL_FILE) // ignore domain
-                    .append(topicName.getTenant()).append(DILIMITER_LOCAL_FILE)
-                    .append(topicName.getNamespacePortion()).append(DILIMITER_LOCAL_FILE);
+                    .append(type).append(DELIMITER_LOCAL_FILE)
+                    .append(DELIMITER_LOCAL_FILE) // ignore domain
+                    .append(topicName.getTenant()).append(DELIMITER_LOCAL_FILE)
+                    .append(topicName.getNamespacePortion()).append(DELIMITER_LOCAL_FILE);
 
-            if (topicName.getPartitionIndex() > -1) {
-                stringBuilder
-                        .append(topicName.getLocalName().split("-partition-")[0]).append(DILIMITER_LOCAL_FILE)
-                        .append(topicName.getPartitionIndex()).append(DILIMITER_LOCAL_FILE);
-            } else {
-                stringBuilder
-                        .append(topicName.getLocalName()).append(DILIMITER_LOCAL_FILE)
-                        .append(DILIMITER_LOCAL_FILE); // no partition index for non-partition topic
-            }
+            addTopicName(topicName, stringBuilder, DELIMITER_LOCAL_FILE);
 
             stringBuilder
-                    .append(group).append(DILIMITER_LOCAL_FILE)
-                    .append(clientIp.replaceAll("/", "").split(":")[0]).append(DILIMITER_LOCAL_FILE)
-                    .append(localIp).append(DILIMITER_LOCAL_FILE)
+                    .append(group).append(DELIMITER_LOCAL_FILE)
+                    .append(clientIp.replaceAll("/", "").split(":")[0]).append(DELIMITER_LOCAL_FILE)
+                    .append(localIp).append(DELIMITER_LOCAL_FILE)
                     .append(timeStamp);
 
             return stringBuilder.toString();
@@ -459,26 +451,18 @@ public class InLongMetricsManager {
             TopicName topicName = TopicName.get(topic);
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder
-                    .append(clusterName).append(DILIMITER_NGCP) // first element is clusterName for NGCP metrics
-                    .append(type).append(DILIMITER_NGCP)
-                    .append(DILIMITER_NGCP) // ignore domain
-                    .append(topicName.getTenant()).append(DILIMITER_NGCP)
-                    .append(topicName.getNamespacePortion()).append(DILIMITER_NGCP);
+                    .append(clusterName).append(DELIMITER_NGCP) // first element is clusterName for NGCP metrics
+                    .append(type).append(DELIMITER_NGCP)
+                    .append(DELIMITER_NGCP) // ignore domain
+                    .append(topicName.getTenant()).append(DELIMITER_NGCP)
+                    .append(topicName.getNamespacePortion()).append(DELIMITER_NGCP);
 
-            if (topicName.getPartitionIndex() > -1) {
-                stringBuilder
-                        .append(topicName.getLocalName().split("-partition-")[0]).append(DILIMITER_NGCP)
-                        .append(topicName.getPartitionIndex()).append(DILIMITER_NGCP);
-            } else {
-                stringBuilder
-                        .append(topicName.getLocalName()).append(DILIMITER_NGCP)
-                        .append(DILIMITER_NGCP);  // no partition index for non-partition topic
-            }
+            addTopicName(topicName, stringBuilder, DELIMITER_NGCP);
 
             stringBuilder
-                    .append(group).append(DILIMITER_NGCP)
-                    .append(ip.replaceAll("/", "").split(":")[0]).append(DILIMITER_NGCP)
-                    .append(localIp).append(DILIMITER_NGCP)
+                    .append(group).append(DELIMITER_NGCP)
+                    .append(ip.replaceAll("/", "").split(":")[0]).append(DELIMITER_NGCP)
+                    .append(localIp).append(DELIMITER_NGCP)
                     .append(formatTimestamp);
 
             return stringBuilder.toString();
@@ -488,17 +472,29 @@ public class InLongMetricsManager {
         }
     }
 
+    public static void addTopicName(TopicName topicName, StringBuilder stringBuilder, String delimiter) {
+        if (topicName.isPartitioned()) {
+            stringBuilder
+                    .append(topicName.getPartitionedTopicName()).append(delimiter)
+                    .append(topicName.getPartitionIndex()).append(delimiter);
+        } else {
+            stringBuilder
+                    .append(topicName.getLocalName()).append(delimiter)
+                    .append(delimiter);
+        }
+    }
+
     private static String getLocalFileMetric(String key, MetricEntity metricEntity) {
-        return key + DILIMITER_LOCAL_FILE
-                + metricEntity.messageNum + DILIMITER_LOCAL_FILE
-                + metricEntity.entryNum + DILIMITER_LOCAL_FILE
+        return key + DELIMITER_LOCAL_FILE
+                + metricEntity.messageNum + DELIMITER_LOCAL_FILE
+                + metricEntity.entryNum + DELIMITER_LOCAL_FILE
                 + metricEntity.messageSize;
     }
 
     private static String getNgcpMetric(String key, MetricEntity metricEntity) {
-        return key + DILIMITER_NGCP
-                + metricEntity.messageNum + DILIMITER_NGCP
-                + metricEntity.entryNum + DILIMITER_NGCP
+        return key + DELIMITER_NGCP
+                + metricEntity.messageNum + DELIMITER_NGCP
+                + metricEntity.entryNum + DELIMITER_NGCP
                 + metricEntity.messageSize;
     }
 

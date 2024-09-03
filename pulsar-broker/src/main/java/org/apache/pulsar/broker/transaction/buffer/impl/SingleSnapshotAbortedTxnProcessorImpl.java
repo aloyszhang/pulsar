@@ -94,6 +94,10 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
         return pulsarClient.getConfiguration().getOperationTimeoutMs();
     }
 
+    private long getSystemClientTbOperationTimeoutMs() throws Exception {
+        return 120000;
+    }
+
     @Override
     public CompletableFuture<PositionImpl> recoverFromSnapshot() {
         return topic.getBrokerService().getPulsar().getTransactionBufferSnapshotServiceFactory()
@@ -107,7 +111,7 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                         log.info("recoverFromSnapshot start topic:{}", topic);
                         while (reader.hasMoreEvents()) {
                             Message<TransactionBufferSnapshot> message = reader.readNextAsync()
-                                    .get(getSystemClientOperationTimeoutMs(), TimeUnit.MILLISECONDS);
+                                    .get(getSystemClientTbOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             entryCount++;
                             log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{}", topic,
                                     entryCount);

@@ -101,10 +101,18 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                 .createReader(TopicName.get(topic.getName())).thenComposeAsync(reader -> {
                     try {
                     PositionImpl startReadCursorPosition = null;
+
+                        int entryCount = 0;
+                        int hitCount = 0;
+                        log.info("recoverFromSnapshot start topic:{}", topic);
                         while (reader.hasMoreEvents()) {
                             Message<TransactionBufferSnapshot> message = reader.readNextAsync()
                                     .get(getSystemClientOperationTimeoutMs(), TimeUnit.MILLISECONDS);
+                            entryCount++;
+                            log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{}", topic,
+                                    entryCount);
                             if (topic.getName().equals(message.getKey())) {
+                                hitCount++;
                                 TransactionBufferSnapshot transactionBufferSnapshot = message.getValue();
                                 if (transactionBufferSnapshot != null) {
                                     handleSnapshot(transactionBufferSnapshot);
@@ -112,6 +120,8 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                                             transactionBufferSnapshot.getMaxReadPositionLedgerId(),
                                             transactionBufferSnapshot.getMaxReadPositionEntryId());
                                 }
+                                log.info("recoverFromSnapshot read entry hit success topic:{}, hitCount:{}", topic,
+                                        hitCount);
                             }
                         }
                         return CompletableFuture.completedFuture(startReadCursorPosition);

@@ -62,6 +62,7 @@ import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
 import org.apache.pulsar.common.policies.data.BacklogQuota;
 import org.apache.pulsar.common.policies.data.DelayedDeliveryPolicies;
 import org.apache.pulsar.common.policies.data.DispatchRate;
@@ -265,6 +266,7 @@ public class CmdTopics extends CmdBase {
         jcommander.addCommand("set-schema-validation-enforce", new SetSchemaValidationEnforced());
 
         jcommander.addCommand("trim-topic", new TrimTopic());
+        jcommander.addCommand("copy-topic", new CopyTopic());
 
         initDeprecatedCommands();
     }
@@ -392,12 +394,12 @@ public class CmdTopics extends CmdBase {
                 description = "Allowed topic domain (persistent, non_persistent).")
         private TopicDomain topicDomain;
 
-        @Parameter(names = { "-b",
-                "--bundle" }, description = "Namespace bundle to get list of topics")
+        @Parameter(names = {"-b",
+                "--bundle"}, description = "Namespace bundle to get list of topics")
         private String bundle;
 
-        @Parameter(names = { "-ist",
-                "--include-system-topic" }, description = "Include system topic")
+        @Parameter(names = {"-ist",
+                "--include-system-topic"}, description = "Include system topic")
         private boolean includeSystemTopic;
 
         @Override
@@ -416,8 +418,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "tenant/namespace", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ist",
-                "--include-system-topic" }, description = "Include system topic")
+        @Parameter(names = {"-ist",
+                "--include-system-topic"}, description = "Include system topic")
         private boolean includeSystemTopic;
 
         @Override
@@ -496,8 +498,8 @@ public class CmdTopics extends CmdBase {
     protected class PartitionedLookup extends CliCommand {
         @Parameter(description = "persistent://tenant/namespace/partitionedTopic", required = true)
         protected java.util.List<String> params;
-        @Parameter(names = { "-s",
-                                "--sort-by-broker" }, description = "Sort partitioned-topic by Broker Url")
+        @Parameter(names = {"-s",
+                "--sort-by-broker"}, description = "Sort partitioned-topic by Broker Url")
         protected boolean sortByBroker = false;
 
         @Override
@@ -541,8 +543,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-p",
-                "--partitions" }, description = "Number of partitions for the topic", required = true)
+        @Parameter(names = {"-p",
+                "--partitions"}, description = "Number of partitions for the topic", required = true)
         private int numPartitions;
 
         @Parameter(names = {"--metadata", "-m"}, description = "key value pair properties(a=a,b=b,c=c)")
@@ -555,6 +557,73 @@ public class CmdTopics extends CmdBase {
             getTopics().createPartitionedTopic(topic, numPartitions, map);
         }
     }
+
+
+    @Parameters(commandDescription = "Create a partitioned topic. "
+            + "The partitioned topic has to be created before creating a producer on it.")
+    private class CopyTopic extends CliCommand {
+
+        @Override
+        void run() throws Exception {
+
+            List<String> partitionedTopicList =
+                    getTopics().getPartitionedTopicList("public/default");
+
+            System.out.println("topics Size:" + partitionedTopicList.size());
+
+            int count = 0;
+            for (String s : partitionedTopicList) {
+                PartitionedTopicMetadata partitionedTopicMetadata = getAdmin().topics().getPartitionedTopicMetadata(s);
+                int partitions = partitionedTopicMetadata.partitions;
+                System.out.println(" topic info " + s + " partitionNum:" + partitions);
+
+                //persistent://wx_finder_live/putin_23208/putin_23208
+                String localName = TopicName.get(s).getLocalName();
+                String newTopicName = "persistent://wx_finder_live/" + localName + "/" + localName;
+
+                try {
+                    String namespace = "wx_finder_live/" + localName;
+                    getAdmin().namespaces().createNamespace(namespace, 150);
+                    getAdmin().namespaces().setPersistence(namespace, new PersistencePolicies(2, 2, 2, 0.01));
+                    getAdmin().namespaces().setRetention(namespace, new RetentionPolicies(1440 * 2, -1));
+                    getAdmin().namespaces().setNamespaceMessageTTL(namespace, 86400 * 2);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    getTopics().createPartitionedTopic(newTopicName, partitions);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                System.out.println(" new topic info " + s + " partitionNum:" + partitions);
+
+                List<String> subscriptions = getTopics().getSubscriptions(s);
+
+                System.out.println("sub size " + subscriptions.size());
+                int createdSubCount = 0;
+                for (String subscription : subscriptions) {
+                    System.out.println(s + " topic create start + subscription info " + subscription);
+
+                    try {
+                        getTopics().createSubscription(newTopicName, subscription, MessageId.latest);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    System.out.println(s + " topic create end + subscription info " + subscription);
+                    createdSubCount++;
+                }
+                System.out.println("sub created size " + createdSubCount);
+
+                count++;
+
+            }
+            System.out.println("process topics Size:" + count);
+        }
+    }
+
 
     @Parameters(commandDescription = "Try to create partitions for partitioned topic. "
             + "The partitions of partition topic has to be created, can be used by repair partitions when "
@@ -595,16 +664,16 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-p",
-                "--partitions" }, description = "Number of partitions for the topic", required = true)
+        @Parameter(names = {"-p",
+                "--partitions"}, description = "Number of partitions for the topic", required = true)
         private int numPartitions;
 
-        @Parameter(names = { "-ulo",
+        @Parameter(names = {"-ulo",
                 "--update-local-only"}, description = "Update partitions number for topic in local cluster only")
         private boolean updateLocalOnly = false;
 
-        @Parameter(names = { "-f",
-                "--force" }, description = "Update forcefully without validating existing partitioned topic")
+        @Parameter(names = {"-f",
+                "--force"}, description = "Update forcefully without validating existing partitioned topic")
         private boolean force;
 
         @Override
@@ -647,7 +716,7 @@ public class CmdTopics extends CmdBase {
         private java.util.List<String> params;
 
         @Parameter(names = {"--property", "-p"}, description = "key value pair properties(-p a=b -p c=d)",
-            required = false, splitter = NoSplitter.class)
+                required = false, splitter = NoSplitter.class)
         private java.util.List<String> properties;
 
         @Override
@@ -686,8 +755,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-f",
-                "--force" }, description = "Close all producer/consumer/replicator and delete topic forcefully")
+        @Parameter(names = {"-f",
+                "--force"}, description = "Close all producer/consumer/replicator and delete topic forcefully")
         private boolean force = false;
 
         @Parameter(names = {"-d", "--deleteSchema"}, description = "Delete schema while deleting topic, "
@@ -710,8 +779,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-f",
-                "--force" }, description = "Close all producer/consumer/replicator and delete topic forcefully")
+        @Parameter(names = {"-f",
+                "--force"}, description = "Close all producer/consumer/replicator and delete topic forcefully")
         private boolean force = false;
 
         @Parameter(names = {"-d", "--deleteSchema"}, description = "Delete schema while deleting topic, "
@@ -769,11 +838,11 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-f",
-            "--force" }, description = "Disconnect and close all consumers and delete subscription forcefully")
+        @Parameter(names = {"-f",
+                "--force"}, description = "Disconnect and close all consumers and delete subscription forcefully")
         private boolean force = false;
 
-        @Parameter(names = { "-s", "--subscription" }, description = "Subscription to be deleted", required = true)
+        @Parameter(names = {"-s", "--subscription"}, description = "Subscription to be deleted", required = true)
         private String subName;
 
         @Override
@@ -789,17 +858,17 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-gpb",
-            "--get-precise-backlog" }, description = "Set true to get precise backlog")
+        @Parameter(names = {"-gpb",
+                "--get-precise-backlog"}, description = "Set true to get precise backlog")
         private boolean getPreciseBacklog = false;
 
-        @Parameter(names = { "-sbs",
-                "--get-subscription-backlog-size" }, description = "Set true to get backlog size for each subscription"
-        + ", locking required. If set to false, the attribute 'backlogSize' in the response will be -1")
+        @Parameter(names = {"-sbs",
+                "--get-subscription-backlog-size"}, description = "Set true to get backlog size for each subscription"
+                + ", locking required. If set to false, the attribute 'backlogSize' in the response will be -1")
         private boolean subscriptionBacklogSize = true;
 
-        @Parameter(names = { "-etb",
-                "--get-earliest-time-in-backlog" }, description = "Set true to get earliest time in backlog")
+        @Parameter(names = {"-etb",
+                "--get-earliest-time-in-backlog"}, description = "Set true to get earliest time in backlog")
         private boolean getEarliestTimeInBacklog = false;
 
         @Override
@@ -814,8 +883,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-m",
-        "--metadata" }, description = "Flag to include ledger metadata")
+        @Parameter(names = {"-m",
+                "--metadata"}, description = "Flag to include ledger metadata")
         private boolean metadata = false;
 
         @Override
@@ -854,17 +923,17 @@ public class CmdTopics extends CmdBase {
         @Parameter(names = "--per-partition", description = "Get per partition stats")
         private boolean perPartition = false;
 
-        @Parameter(names = { "-gpb",
-            "--get-precise-backlog" }, description = "Set true to get precise backlog")
+        @Parameter(names = {"-gpb",
+                "--get-precise-backlog"}, description = "Set true to get precise backlog")
         private boolean getPreciseBacklog = false;
 
-        @Parameter(names = { "-sbs",
-                "--get-subscription-backlog-size" }, description = "Set true to get backlog size for each subscription"
+        @Parameter(names = {"-sbs",
+                "--get-subscription-backlog-size"}, description = "Set true to get backlog size for each subscription"
                 + ", locking required.")
         private boolean subscriptionBacklogSize = true;
 
-        @Parameter(names = { "-etb",
-                "--get-earliest-time-in-backlog" }, description = "Set true to get earliest time in backlog")
+        @Parameter(names = {"-etb",
+                "--get-earliest-time-in-backlog"}, description = "Set true to get earliest time in backlog")
         private boolean getEarliestTimeInBacklog = false;
 
         @Override
@@ -880,8 +949,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to reset position on", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to reset position on", required = true)
         private String subscriptionName;
 
         @Override
@@ -897,8 +966,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to reset position on", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to reset position on", required = true)
         private String subscriptionName;
 
         @Override
@@ -928,7 +997,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s", "--subscription" }, description = "Subscription to be cleared", required = true)
+        @Parameter(names = {"-s", "--subscription"}, description = "Subscription to be cleared", required = true)
         private String subName;
 
         @Override
@@ -943,11 +1012,11 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to be skip messages on", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to be skip messages on", required = true)
         private String subName;
 
-        @Parameter(names = { "-n", "--count" }, description = "Number of messages to skip", required = true)
+        @Parameter(names = {"-n", "--count"}, description = "Number of messages to skip", required = true)
         private long numMessages;
 
         @Override
@@ -963,19 +1032,19 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to be skip messages on", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to be skip messages on", required = true)
         private String subName;
 
-        @Parameter(names = { "-t", "--expireTime" }, description = "Expire messages older than time in seconds "
+        @Parameter(names = {"-t", "--expireTime"}, description = "Expire messages older than time in seconds "
                 + "(or minutes, hours, days, weeks eg: 100m, 3h, 2d, 5w)")
         private String expireTimeStr = null;
 
-        @Parameter(names = { "--position",
-                "-p" }, description = "message position to reset back to (ledgerId:entryId)", required = false)
+        @Parameter(names = {"--position",
+                "-p"}, description = "message position to reset back to (ledgerId:entryId)", required = false)
         private String messagePosition;
 
-        @Parameter(names = { "-e", "--exclude-reset-position" },
+        @Parameter(names = {"-e", "--exclude-reset-position"},
                 description = "Exclude the reset position, start consume messages from the next position.")
         private boolean excludeResetPosition = false;
 
@@ -1015,7 +1084,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-t", "--expireTime" }, description = "Expire messages older than time in seconds "
+        @Parameter(names = {"-t", "--expireTime"}, description = "Expire messages older than time in seconds "
                 + "(or minutes, hours, days, weeks eg: 100m, 3h, 2d, 5w)", required = true)
         private String expireTimeStr;
 
@@ -1037,15 +1106,15 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to reset position on", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to reset position on", required = true)
         private String subscriptionName;
 
-        @Parameter(names = { "-m" , "--messageId" }, description = "messageId where to create the subscription. "
+        @Parameter(names = {"-m", "--messageId"}, description = "messageId where to create the subscription. "
                 + "It can be either 'latest', 'earliest' or (ledgerId:entryId)", required = false)
         private String messageIdStr = "latest";
 
-        @Parameter(names = { "-r", "--replicated" }, description = "replicated subscriptions", required = false)
+        @Parameter(names = {"-r", "--replicated"}, description = "replicated subscriptions", required = false)
         private boolean replicated = false;
 
         @Parameter(names = {"--property", "-p"}, description = "key value pair properties(-p a=b -p c=d)",
@@ -1073,8 +1142,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to update", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to update", required = true)
         private String subscriptionName;
 
         @Parameter(names = {"--property", "-p"}, description = "key value pair properties(-p a=b -p c=d)",
@@ -1107,8 +1176,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to describe", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to describe", required = true)
         private String subscriptionName;
 
         @Override
@@ -1127,20 +1196,20 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to reset position on", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to reset position on", required = true)
         private String subName;
 
-        @Parameter(names = { "--time",
-                "-t" }, description = "time in minutes to reset back to "
+        @Parameter(names = {"--time",
+                "-t"}, description = "time in minutes to reset back to "
                 + "(or minutes, hours, days, weeks eg: 100m, 3h, 2d, 5w)", required = false)
         private String resetTimeStr;
 
-        @Parameter(names = { "--messageId",
-                "-m" }, description = "messageId to reset back to ('latest', 'earliest', or 'ledgerId:entryId')")
+        @Parameter(names = {"--messageId",
+                "-m"}, description = "messageId to reset back to ('latest', 'earliest', or 'ledgerId:entryId')")
         private String resetMessageIdStr;
 
-        @Parameter(names = { "-e", "--exclude-reset-position" },
+        @Parameter(names = {"-e", "--exclude-reset-position"},
                 description = "Exclude the reset position, start consume messages from the next position.")
         private boolean excludeResetPosition = false;
 
@@ -1206,9 +1275,9 @@ public class CmdTopics extends CmdBase {
         void run() throws PulsarAdminException, TimeoutException {
             String persistentTopic = validatePersistentTopic(params);
             Map<Integer, MessageId> messageIds = getTopics().terminatePartitionedTopic(persistentTopic);
-            for (Map.Entry<Integer, MessageId> entry: messageIds.entrySet()) {
+            for (Map.Entry<Integer, MessageId> entry : messageIds.entrySet()) {
                 String topicName = persistentTopic + "-partition-" + entry.getKey();
-                System.out.println("Topic " + topicName +  " successfully terminated at " + entry.getValue());
+                System.out.println("Topic " + topicName + " successfully terminated at " + entry.getValue());
             }
         }
     }
@@ -1218,11 +1287,11 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription to get messages from", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription to get messages from", required = true)
         private String subName;
 
-        @Parameter(names = { "-n", "--count" }, description = "Number of messages (default 1)", required = false)
+        @Parameter(names = {"-n", "--count"}, description = "Number of messages (default 1)", required = false)
         private int numMessages = 1;
 
         @Override
@@ -1279,12 +1348,12 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-i", "--initialPosition" },
+        @Parameter(names = {"-i", "--initialPosition"},
                 description = "Relative start position to examine message."
                         + "It can be 'latest' or 'earliest', default is latest")
         private String initialPosition = "latest";
 
-        @Parameter(names = { "-m", "--messagePosition" },
+        @Parameter(names = {"-m", "--messagePosition"},
                 description = "The position of messages (default 1)", required = false)
         private long messagePosition = 1;
 
@@ -1334,14 +1403,14 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-l", "--ledgerId" },
-            description = "ledger id pointing to the desired ledger",
-            required = true)
+        @Parameter(names = {"-l", "--ledgerId"},
+                description = "ledger id pointing to the desired ledger",
+                required = true)
         private long ledgerId;
 
-        @Parameter(names = { "-e", "--entryId" },
-            description = "entry id pointing to the desired entry",
-            required = true)
+        @Parameter(names = {"-e", "--entryId"},
+                description = "entry id pointing to the desired entry",
+                required = true)
         private long entryId;
 
         @Override
@@ -1396,7 +1465,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-d", "--datetime" },
+        @Parameter(names = {"-d", "--datetime"},
                 description = "datetime at or before this messageId. This datetime is in format of "
                         + "ISO_OFFSET_DATE_TIME, e.g. 2021-06-28T16:53:08Z or 2021-06-28T16:53:08.123456789+08:00",
                 required = true)
@@ -1435,8 +1504,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-w", "--wait-complete" },
-                   description = "Wait for compaction to complete", required = false)
+        @Parameter(names = {"-w", "--wait-complete"},
+                description = "Wait for compaction to complete", required = false)
         private boolean wait = false;
 
         @Override
@@ -1451,19 +1520,19 @@ public class CmdTopics extends CmdBase {
                 }
 
                 switch (status.status) {
-                case NOT_RUN:
-                    System.out.println("Compaction has not been run for " + persistentTopic
-                                       + " since broker startup");
-                    break;
-                case RUNNING:
-                    System.out.println("Compaction is currently running");
-                    break;
-                case SUCCESS:
-                    System.out.println("Compaction was a success");
-                    break;
-                case ERROR:
-                    System.out.println("Error in compaction");
-                    throw new PulsarAdminException("Error compacting: " + status.lastError);
+                    case NOT_RUN:
+                        System.out.println("Compaction has not been run for " + persistentTopic
+                                + " since broker startup");
+                        break;
+                    case RUNNING:
+                        System.out.println("Compaction is currently running");
+                        break;
+                    case SUCCESS:
+                        System.out.println("Compaction was a success");
+                        break;
+                    case ERROR:
+                        System.out.println("Error in compaction");
+                        throw new PulsarAdminException("Error compacting: " + status.lastError);
                 }
             } catch (InterruptedException e) {
                 throw new PulsarAdminException(e);
@@ -1489,9 +1558,9 @@ public class CmdTopics extends CmdBase {
 
     @Parameters(commandDescription = "Trigger offload of data from a topic to long-term storage (e.g. Amazon S3)")
     private class Offload extends CliCommand {
-        @Parameter(names = { "-s", "--size-threshold" },
-                   description = "Maximum amount of data to keep in BookKeeper for the specified topic (e.g. 10M, 5G).",
-                   required = true)
+        @Parameter(names = {"-s", "--size-threshold"},
+                description = "Maximum amount of data to keep in BookKeeper for the specified topic (e.g. 10M, 5G).",
+                required = true)
         private String sizeThresholdStr;
 
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
@@ -1526,8 +1595,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-w", "--wait-complete" },
-                   description = "Wait for offloading to complete", required = false)
+        @Parameter(names = {"-w", "--wait-complete"},
+                description = "Wait for offloading to complete", required = false)
         private boolean wait = false;
 
         @Override
@@ -1542,19 +1611,19 @@ public class CmdTopics extends CmdBase {
                 }
 
                 switch (status.getStatus()) {
-                case NOT_RUN:
-                    System.out.println("Offload has not been run for " + persistentTopic
-                                       + " since broker startup");
-                    break;
-                case RUNNING:
-                    System.out.println("Offload is currently running");
-                    break;
-                case SUCCESS:
-                    System.out.println("Offload was a success");
-                    break;
-                case ERROR:
-                    System.out.println("Error in offload");
-                    throw new PulsarAdminException("Error offloading: " + status.getLastError());
+                    case NOT_RUN:
+                        System.out.println("Offload has not been run for " + persistentTopic
+                                + " since broker startup");
+                        break;
+                    case RUNNING:
+                        System.out.println("Offload is currently running");
+                        break;
+                    case SUCCESS:
+                        System.out.println("Offload was a success");
+                        break;
+                    case ERROR:
+                        System.out.println("Error in offload");
+                        throw new PulsarAdminException("Error offloading: " + status.getLastError());
                 }
             } catch (InterruptedException e) {
                 throw new PulsarAdminException(e);
@@ -1594,15 +1663,15 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-l", "--limit" }, description = "Size limit (eg: 10M, 16G)")
+        @Parameter(names = {"-l", "--limit"}, description = "Size limit (eg: 10M, 16G)")
         private String limitStr = "-1";
 
-        @Parameter(names = { "-lt", "--limitTime" },
+        @Parameter(names = {"-lt", "--limitTime"},
                 description = "Time limit in second (or minutes, hours, days, weeks eg: 100m, 3h, 2d, 5w), "
                         + "non-positive number for disabling time limit.")
         private String limitTimeStr = null;
 
-        @Parameter(names = { "-p", "--policy" },
+        @Parameter(names = {"-p", "--policy"},
                 description = "Retention policy to enforce when the limit is reached. Valid options are: "
                         + "[producer_request_hold, producer_exception, consumer_backlog_eviction]", required = true)
         private String policyStr;
@@ -1680,7 +1749,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -1695,8 +1764,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--clusters",
-                "-c" }, description = "Replication Cluster Ids list (comma separated values)", required = true)
+        @Parameter(names = {"--clusters",
+                "-c"}, description = "Replication Cluster Ids list (comma separated values)", required = true)
         private String clusterIds;
 
         @Override
@@ -1736,8 +1805,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--topics",
-                "-t" }, description = "Shadow topic list (comma separated values)", required = true)
+        @Parameter(names = {"--topics",
+                "-t"}, description = "Shadow topic list (comma separated values)", required = true)
         private String shadowTopics;
 
         @Override
@@ -1797,7 +1866,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -1812,13 +1881,13 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "tenant/namespace", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--enable", "-e" }, description = "Enable delayed delivery messages")
+        @Parameter(names = {"--enable", "-e"}, description = "Enable delayed delivery messages")
         private boolean enable = false;
 
-        @Parameter(names = { "--disable", "-d" }, description = "Disable delayed delivery messages")
+        @Parameter(names = {"--disable", "-d"}, description = "Disable delayed delivery messages")
         private boolean disable = false;
 
-        @Parameter(names = { "--time", "-t" },
+        @Parameter(names = {"--time", "-t"},
                 description = "The tick time for when retrying on delayed delivery messages, affecting the accuracy of "
                         + "the delivery time compared to the scheduled time. (eg: 1s, 10s, 1m, 5h, 3d)")
         private String delayedDeliveryTimeStr = "1s";
@@ -1862,7 +1931,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -1877,9 +1946,9 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-t", "--ttl" }, description = "Message TTL for topic in second "
+        @Parameter(names = {"-t", "--ttl"}, description = "Message TTL for topic in second "
                 + "(or minutes, hours, days, weeks eg: 100m, 3h, 2d, 5w), "
-                        + "allowed range from 1 to Integer.MAX_VALUE", required = true)
+                + "allowed range from 1 to Integer.MAX_VALUE", required = true)
         private String messageTTLStr;
 
         @Override
@@ -1931,7 +2000,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-i", "--interval" }, description = "Deduplication snapshot interval for topic in second, "
+        @Parameter(names = {"-i", "--interval"}, description = "Deduplication snapshot interval for topic in second, "
                 + "allowed range from 0 to Integer.MAX_VALUE", required = true)
         private int interval;
 
@@ -1964,7 +2033,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -1979,15 +2048,15 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--time",
-                "-t" }, description = "Retention time with optional time unit suffix. "
+        @Parameter(names = {"--time",
+                "-t"}, description = "Retention time with optional time unit suffix. "
                 + "For example, 100m, 3h, 2d, 5w. "
                 + "If the time unit is not specified, the default unit is seconds. For example, "
                 + "-t 120 will set retention to 2 minutes. "
                 + "0 means no retention and -1 means infinite time retention.", required = true)
         private String retentionTimeStr;
 
-        @Parameter(names = { "--size", "-s" }, description = "Retention size limit with optional size unit suffix. "
+        @Parameter(names = {"--size", "-s"}, description = "Retention size limit with optional size unit suffix. "
                 + "For example, 4096, 10M, 16G, 3T.  The size unit suffix character can be k/K, m/M, g/G, or t/T.  "
                 + "If the size unit suffix is not specified, the default unit is bytes. "
                 + "0 or less than 1MB means no retention and -1 means infinite size retention", required = true)
@@ -2052,10 +2121,10 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--enable", "-e" }, description = "Enable deduplication")
+        @Parameter(names = {"--enable", "-e"}, description = "Enable deduplication")
         private boolean enable = false;
 
-        @Parameter(names = { "--disable", "-d" }, description = "Disable deduplication")
+        @Parameter(names = {"--disable", "-d"}, description = "Disable deduplication")
         private boolean disable = false;
 
         @Override
@@ -2122,7 +2191,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2182,12 +2251,12 @@ public class CmdTopics extends CmdBase {
 
         @Parameter(names = {"-m", "--maxBlockSizeInBytes"},
                 description = "ManagedLedger offload max block Size in bytes,"
-                + "s3 and google-cloud-storage requires this parameter")
+                        + "s3 and google-cloud-storage requires this parameter")
         private int maxBlockSizeInBytes;
 
         @Parameter(names = {"-rb", "--readBufferSizeInBytes"},
                 description = "ManagedLedger offload read buffer size in bytes,"
-                + "s3 and google-cloud-storage requires this parameter")
+                        + "s3 and google-cloud-storage requires this parameter")
         private int readBufferSizeInBytes;
 
         @Parameter(names = {"-t", "--offloadThresholdInBytes"}
@@ -2224,8 +2293,8 @@ public class CmdTopics extends CmdBase {
                 } catch (Exception e) {
                     throw new ParameterException("--offloadedReadPriority parameter must be one of "
                             + Arrays.stream(OffloadedReadPriority.values())
-                                    .map(OffloadedReadPriority::toString)
-                                    .collect(Collectors.joining(","))
+                            .map(OffloadedReadPriority::toString)
+                            .collect(Collectors.joining(","))
                             + " but got: " + this.offloadReadPriorityStr, e);
                 }
             }
@@ -2246,20 +2315,20 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-e",
-                "--bookkeeper-ensemble" }, description = "Number of bookies to use for a topic")
+        @Parameter(names = {"-e",
+                "--bookkeeper-ensemble"}, description = "Number of bookies to use for a topic")
         private int bookkeeperEnsemble = 2;
 
-        @Parameter(names = { "-w",
-                "--bookkeeper-write-quorum" }, description = "How many writes to make of each entry")
+        @Parameter(names = {"-w",
+                "--bookkeeper-write-quorum"}, description = "How many writes to make of each entry")
         private int bookkeeperWriteQuorum = 2;
 
-        @Parameter(names = { "-a",
-                "--bookkeeper-ack-quorum" }, description = "Number of acks (guaranteed copies) to wait for each entry")
+        @Parameter(names = {"-a",
+                "--bookkeeper-ack-quorum"}, description = "Number of acks (guaranteed copies) to wait for each entry")
         private int bookkeeperAckQuorum = 2;
 
-        @Parameter(names = { "-r",
-                "--ml-mark-delete-max-rate" }, description = "Throttling rate of mark-delete operation "
+        @Parameter(names = {"-r",
+                "--ml-mark-delete-max-rate"}, description = "Throttling rate of mark-delete operation "
                 + "(0 means no throttle)")
         private double managedLedgerMaxMarkDeleteRate = 0;
 
@@ -2295,7 +2364,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2310,21 +2379,21 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--msg-dispatch-rate",
-                "-md" }, description = "message-dispatch-rate (default -1 will be overwrite if not passed)")
+        @Parameter(names = {"--msg-dispatch-rate",
+                "-md"}, description = "message-dispatch-rate (default -1 will be overwrite if not passed)")
         private int msgDispatchRate = -1;
 
-        @Parameter(names = { "--byte-dispatch-rate",
-                "-bd" }, description = "byte-dispatch-rate (default -1 will be overwrite if not passed)")
+        @Parameter(names = {"--byte-dispatch-rate",
+                "-bd"}, description = "byte-dispatch-rate (default -1 will be overwrite if not passed)")
         private long byteDispatchRate = -1;
 
-        @Parameter(names = { "--dispatch-rate-period",
-                "-dt" }, description = "dispatch-rate-period in second type "
+        @Parameter(names = {"--dispatch-rate-period",
+                "-dt"}, description = "dispatch-rate-period in second type "
                 + "(default 1 second will be overwrite if not passed)", required = false)
         private int dispatchRatePeriodSec = 1;
 
-        @Parameter(names = { "--relative-to-publish-rate",
-                "-rp" }, description = "dispatch rate relative to publish-rate (if publish-relative flag is enabled "
+        @Parameter(names = {"--relative-to-publish-rate",
+                "-rp"}, description = "dispatch rate relative to publish-rate (if publish-relative flag is enabled "
                 + "then broker will apply throttling value to (publish-rate + dispatch rate))", required = false)
         private boolean relativeToPublishRate = false;
 
@@ -2358,7 +2427,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2400,7 +2469,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2494,7 +2563,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2509,10 +2578,10 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--threshold", "-t" },
-            description = "Maximum number of bytes in a topic backlog before compaction is triggered "
-                + "(eg: 10M, 16G, 3T). 0 disables automatic compaction",
-            required = true)
+        @Parameter(names = {"--threshold", "-t"},
+                description = "Maximum number of bytes in a topic backlog before compaction is triggered "
+                        + "(eg: 10M, 16G, 3T). 0 disables automatic compaction",
+                required = true)
         private String thresholdStr = "0";
 
         @Override
@@ -2552,19 +2621,20 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--msg-publish-rate",
-            "-m" }, description = "message-publish-rate (default -1 will be overwrite if not passed)", required = false)
+        @Parameter(names = {"--msg-publish-rate",
+                "-m"}, description = "message-publish-rate (default -1 will be overwrite if not passed)", required =
+                false)
         private int msgPublishRate = -1;
 
-         @Parameter(names = { "--byte-publish-rate",
-            "-b" }, description = "byte-publish-rate (default -1 will be overwrite if not passed)", required = false)
+        @Parameter(names = {"--byte-publish-rate",
+                "-b"}, description = "byte-publish-rate (default -1 will be overwrite if not passed)", required = false)
         private long bytePublishRate = -1;
 
         @Override
         void run() throws PulsarAdminException {
             String persistentTopic = validatePersistentTopic(params);
             getTopics().setPublishRate(persistentTopic,
-                new PublishRate(msgPublishRate, bytePublishRate));
+                    new PublishRate(msgPublishRate, bytePublishRate));
         }
     }
 
@@ -2585,7 +2655,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2600,21 +2670,22 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--msg-dispatch-rate",
-            "-md" }, description = "message-dispatch-rate (default -1 will be overwrite if not passed)")
+        @Parameter(names = {"--msg-dispatch-rate",
+                "-md"}, description = "message-dispatch-rate (default -1 will be overwrite if not passed)")
         private int msgDispatchRate = -1;
 
-        @Parameter(names = { "--byte-dispatch-rate",
-            "-bd" }, description = "byte-dispatch-rate (default -1 will be overwrite if not passed)", required = false)
+        @Parameter(names = {"--byte-dispatch-rate",
+                "-bd"}, description = "byte-dispatch-rate (default -1 will be overwrite if not passed)", required =
+                false)
         private long byteDispatchRate = -1;
 
-        @Parameter(names = { "--dispatch-rate-period",
-            "-dt" }, description = "dispatch-rate-period in second type"
+        @Parameter(names = {"--dispatch-rate-period",
+                "-dt"}, description = "dispatch-rate-period in second type"
                 + " (default 1 second will be overwrite if not passed)")
         private int dispatchRatePeriodSec = 1;
 
-        @Parameter(names = { "--relative-to-publish-rate",
-                "-rp" }, description = "dispatch rate relative to publish-rate (if publish-relative flag is enabled "
+        @Parameter(names = {"--relative-to-publish-rate",
+                "-rp"}, description = "dispatch rate relative to publish-rate (if publish-relative flag is enabled "
                 + "then broker will apply throttling value to (publish-rate + dispatch rate))")
         private boolean relativeToPublishRate = false;
 
@@ -2663,21 +2734,22 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--msg-dispatch-rate",
-            "-md" }, description = "message-dispatch-rate (default -1 will be overwrite if not passed)")
+        @Parameter(names = {"--msg-dispatch-rate",
+                "-md"}, description = "message-dispatch-rate (default -1 will be overwrite if not passed)")
         private int msgDispatchRate = -1;
 
-        @Parameter(names = { "--byte-dispatch-rate",
-            "-bd" }, description = "byte-dispatch-rate (default -1 will be overwrite if not passed)", required = false)
+        @Parameter(names = {"--byte-dispatch-rate",
+                "-bd"}, description = "byte-dispatch-rate (default -1 will be overwrite if not passed)", required =
+                false)
         private long byteDispatchRate = -1;
 
-        @Parameter(names = { "--dispatch-rate-period",
-            "-dt" }, description = "dispatch-rate-period in second type "
-            + "(default 1 second will be overwrite if not passed)")
+        @Parameter(names = {"--dispatch-rate-period",
+                "-dt"}, description = "dispatch-rate-period in second type "
+                + "(default 1 second will be overwrite if not passed)")
         private int dispatchRatePeriodSec = 1;
 
-        @Parameter(names = { "--relative-to-publish-rate",
-                "-rp" }, description = "dispatch rate relative to publish-rate (if publish-relative flag is enabled "
+        @Parameter(names = {"--relative-to-publish-rate",
+                "-rp"}, description = "dispatch rate relative to publish-rate (if publish-relative flag is enabled "
                 + "then broker will apply throttling value to (publish-rate + dispatch rate))")
         private boolean relativeToPublishRate = false;
 
@@ -2711,7 +2783,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2844,7 +2916,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--max-consumers-per-subscription", "-c" },
+        @Parameter(names = {"--max-consumers-per-subscription", "-c"},
                 description = "maxConsumersPerSubscription for a namespace", required = true)
         private int maxConsumersPerSubscription;
 
@@ -2872,7 +2944,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2887,10 +2959,10 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--enable-delete-while-inactive", "-e" }, description = "Enable delete while inactive")
+        @Parameter(names = {"--enable-delete-while-inactive", "-e"}, description = "Enable delete while inactive")
         private boolean enableDeleteWhileInactive = false;
 
-        @Parameter(names = { "--disable-delete-while-inactive", "-d" }, description = "Disable delete while inactive")
+        @Parameter(names = {"--disable-delete-while-inactive", "-d"}, description = "Disable delete while inactive")
         private boolean disableDeleteWhileInactive = false;
 
         @Parameter(names = {"--max-inactive-duration", "-t"}, description = "Max duration of topic inactivity "
@@ -2898,7 +2970,7 @@ public class CmdTopics extends CmdBase {
                 + "(eg: 1s, 10s, 1m, 5h, 3d)", required = true)
         private String deleteInactiveTopicsMaxInactiveDuration;
 
-        @Parameter(names = { "--delete-mode", "-m" }, description = "Mode of delete inactive topic, Valid options are: "
+        @Parameter(names = {"--delete-mode", "-m"}, description = "Mode of delete inactive topic, Valid options are: "
                 + "[delete_when_no_subscriptions, delete_when_subscriptions_caught_up]", required = true)
         private String inactiveTopicDeleteMode;
 
@@ -2946,7 +3018,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -2961,7 +3033,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--max-consumers", "-c" }, description = "Max consumers for a topic", required = true)
+        @Parameter(names = {"--max-consumers", "-c"}, description = "Max consumers for a topic", required = true)
         private int maxConsumers;
 
         @Override
@@ -2988,7 +3060,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -3003,12 +3075,12 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--subscribe-rate",
-                "-sr" }, description = "subscribe-rate (default -1 will be overwrite if not passed)", required = false)
+        @Parameter(names = {"--subscribe-rate",
+                "-sr"}, description = "subscribe-rate (default -1 will be overwrite if not passed)", required = false)
         private int subscribeRate = -1;
 
-        @Parameter(names = { "--subscribe-rate-period",
-                "-st" }, description = "subscribe-rate-period in second type "
+        @Parameter(names = {"--subscribe-rate-period",
+                "-st"}, description = "subscribe-rate-period in second type "
                 + "(default 30 second will be overwrite if not passed)")
         private int subscribeRatePeriodSec = 30;
 
@@ -3037,14 +3109,14 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s",
-                "--subscription" }, description = "Subscription name to enable or disable replication", required = true)
+        @Parameter(names = {"-s",
+                "--subscription"}, description = "Subscription name to enable or disable replication", required = true)
         private String subName;
 
-        @Parameter(names = { "--enable", "-e" }, description = "Enable replication")
+        @Parameter(names = {"--enable", "-e"}, description = "Enable replication")
         private boolean enable = false;
 
-        @Parameter(names = { "--disable", "-d" }, description = "Disable replication")
+        @Parameter(names = {"--disable", "-d"}, description = "Disable replication")
         private boolean disable = false;
 
         @Override
@@ -3082,8 +3154,8 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--messageId",
-                "-m" }, description = "messageId used to calculate backlog size. It can be (ledgerId:entryId).")
+        @Parameter(names = {"--messageId",
+                "-m"}, description = "messageId used to calculate backlog size. It can be (ledgerId:entryId).")
         private String messagePosition = "-1:-1";
 
         @Override
@@ -3106,11 +3178,11 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-s", "--subscription" }, description = "Subscription to be analyzed", required = true)
+        @Parameter(names = {"-s", "--subscription"}, description = "Subscription to be analyzed", required = true)
         private String subName;
 
-        @Parameter(names = { "--position",
-                "-p" }, description = "message position to start the scan from (ledgerId:entryId)", required = false)
+        @Parameter(names = {"--position",
+                "-p"}, description = "message position to start the scan from (ledgerId:entryId)", required = false)
         private String messagePosition;
 
         @Override
@@ -3132,7 +3204,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "tenant/namespace", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "-ap", "--applied" }, description = "Get the applied policy of the topic")
+        @Parameter(names = {"-ap", "--applied"}, description = "Get the applied policy of the topic")
         private boolean applied = false;
 
         @Override
@@ -3147,7 +3219,7 @@ public class CmdTopics extends CmdBase {
         @Parameter(description = "tenant/namespace", required = true)
         private java.util.List<String> params;
 
-        @Parameter(names = { "--enable", "-e" }, description = "Enable schema validation enforced")
+        @Parameter(names = {"--enable", "-e"}, description = "Enable schema validation enforced")
         private boolean enable = false;
 
         @Override
@@ -3156,6 +3228,7 @@ public class CmdTopics extends CmdBase {
             getAdmin().topics().setSchemaValidationEnforced(topic, enable);
         }
     }
+
     @Parameters(commandDescription = "Trim a topic")
     private class TrimTopic extends CliCommand {
         @Parameter(description = "persistent://tenant/namespace/topic", required = true)

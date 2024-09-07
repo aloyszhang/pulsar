@@ -128,6 +128,8 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                                         hitCount);
                             }
                         }
+                        log.info("recoverFromSnapshot end topic:{}, entryCount={},hitCount={}", topic, entryCount,
+                                hitCount);
                         return CompletableFuture.completedFuture(startReadCursorPosition);
                     } catch (TimeoutException ex) {
                         Throwable t = FutureUtil.unwrapCompletionException(ex);

@@ -2073,6 +2073,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
     protected void handleGetLastMessageId(CommandGetLastMessageId getLastMessageId) {
         checkArgument(state == State.Connected);
 
+        long startTime = System.currentTimeMillis();
         CompletableFuture<Consumer> consumerFuture = consumers.get(getLastMessageId.getConsumerId());
 
         if (consumerFuture != null && consumerFuture.isDone() && !consumerFuture.isCompletedExceptionally()) {
@@ -2098,16 +2099,28 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                              partitionIndex,
                              requestId,
                              consumer.getSubscription().getName(),
-                             consumer.readCompacted());
+                             consumer.readCompacted(),
+                             startTime);
                     return null;
                  }).exceptionally(e -> {
                      writeAndFlush(Commands.newError(getLastMessageId.getRequestId(),
                              ServerError.UnknownError, "Failed to recover Transaction Buffer."));
-                     return null;
+                        long cost = System.currentTimeMillis() - startTime;
+                        log.error("handleGetLastMessageId error Failed to recover Transaction Buffer cost:{}", cost);
+                        if (cost > 1000) {
+                            log.info("handleGetLastMessageId error Consumer not found cost:{} gt 1000", cost);
+                        }
+
+                        return null;
                  });
         } else {
             writeAndFlush(Commands.newError(getLastMessageId.getRequestId(),
                     ServerError.MetadataError, "Consumer not found"));
+            long cost = System.currentTimeMillis() - startTime;
+            log.error("handleGetLastMessageId error Consumer not found cost:{}", cost);
+            if (cost > 1000) {
+                log.info("handleGetLastMessageId error Consumer not found cost:{} gt 1000", cost);
+            }
         }
     }
 
@@ -2118,7 +2131,8 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             int partitionIndex,
             long requestId,
             String subscriptionName,
-            boolean readCompacted) {
+            boolean readCompacted,
+            long startTime) {
         PersistentTopic persistentTopic = (PersistentTopic) topic;
         ManagedLedgerImpl ml = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
 
@@ -2180,6 +2194,13 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                     writeAndFlush(Commands.newError(
                             requestId, ServerError.MetadataError,
                             "Failed to get batch size for entry " + e.getMessage()));
+                    long cost = System.currentTimeMillis() - startTime;
+                    log.error("handleGetLastMessageId error Failed to get batch size for entry cost:{}",
+                            cost);
+                    if (cost > 1000) {
+                        log.info("handleGetLastMessageId error Failed to get batch size for entry cost:{} gt 1000",
+                                cost);
+                    }
                 }
             } else {
                 int largestBatchIndex = batchSize > 0 ? batchSize - 1 : -1;
@@ -2193,6 +2214,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                         lastPosition.getEntryId(), partitionIndex, largestBatchIndex,
                         markDeletePosition != null ? markDeletePosition.getLedgerId() : -1,
                         markDeletePosition != null ? markDeletePosition.getEntryId() : -1));
+                long cost = System.currentTimeMillis() - startTime;
+                log.info("handleGetLastMessageId success cost:{}", cost);
+                if (cost > 1000) {
+                    log.info("handleGetLastMessageId success cost:{} gt 1000", cost);
+                }
             }
         });
     }

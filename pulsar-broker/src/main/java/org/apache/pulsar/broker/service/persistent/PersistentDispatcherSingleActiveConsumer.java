@@ -496,7 +496,8 @@ public class PersistentDispatcherSingleActiveConsumer extends AbstractDispatcher
                         exception.getMessage(), waitTimeMillis / 1000.0);
             }
         } else if (!(exception instanceof TooManyRequestsException)) {
-            log.error("[{}-{}] Error reading entries at {} : {} - Retrying to read in {} seconds", name, c,
+            log.error("internalReadEntriesFailed exception", exception);
+            log.error("[{}-{}] v2 Error reading entries at {} : {} - Retrying to read in {} seconds", name, c,
                     cursor.getReadPosition(), exception.getMessage(), waitTimeMillis / 1000.0, exception);
         } else {
             if (log.isDebugEnabled()) {

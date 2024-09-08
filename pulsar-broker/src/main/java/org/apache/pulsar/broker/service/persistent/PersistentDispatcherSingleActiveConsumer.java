@@ -497,7 +497,7 @@ public class PersistentDispatcherSingleActiveConsumer extends AbstractDispatcher
             }
         } else if (!(exception instanceof TooManyRequestsException)) {
             log.error("[{}-{}] Error reading entries at {} : {} - Retrying to read in {} seconds", name, c,
-                    cursor.getReadPosition(), exception.getMessage(), waitTimeMillis / 1000.0);
+                    cursor.getReadPosition(), exception.getMessage(), waitTimeMillis / 1000.0, exception);
         } else {
             if (log.isDebugEnabled()) {
                 log.debug("[{}-{}] Got throttled by bookies while reading at {} : {} - Retrying to read in {} seconds",

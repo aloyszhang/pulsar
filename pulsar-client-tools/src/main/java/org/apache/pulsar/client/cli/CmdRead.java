@@ -104,6 +104,9 @@ public class CmdRead extends AbstractCmdConsume {
     @Parameter(names = { "-pm", "--pool-messages" }, description = "Use the pooled message", arity = 1)
     private boolean poolMessages = true;
 
+    @Parameter(names = {"-rc", "--readCompacted" }, description = "Whether the subscription status should be readCompacted")
+    private boolean readCompacted = false;
+
     public CmdRead() {
         // Do nothing
         super();
@@ -147,6 +150,7 @@ public class CmdRead extends AbstractCmdConsume {
             builder = client.newReader(schema)
                     .topic(topic)
                     .startMessageId(parseMessageId(startMessageId))
+                    .readCompacted(readCompacted)
                     .poolMessages(poolMessages);
 
             if (this.startMessageIdInclusive) {
@@ -175,9 +179,12 @@ public class CmdRead extends AbstractCmdConsume {
                     Message<?> msg = reader.readNext(5, TimeUnit.SECONDS);
                     if (msg == null) {
                         LOG.debug("No message to read after waiting for 5 seconds.");
+                        System.out.println("No message to read after waiting for 5 seconds.");
                     } else {
                         try {
                             numMessagesRead += 1;
+                            System.out.println(
+                                    "read success count:" + numMessagesRead + "publishTime:" + msg.getPublishTime());
                             if (!hideContent) {
                                 System.out.println(MESSAGE_BOUNDARY);
                                 String output = this.interpretMessage(msg, displayHex);

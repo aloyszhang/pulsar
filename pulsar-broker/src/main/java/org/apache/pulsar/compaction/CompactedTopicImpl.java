@@ -252,6 +252,7 @@ public class CompactedTopicImpl implements CompactedTopic {
                            (rc, ledger, ctx) -> {
                                if (rc != BKException.Code.OK) {
                                    promise.completeExceptionally(BKException.create(rc));
+                                   log.info("openCompactedLedger error:{}, rc:{}", id, rc);
                                } else {
                                    promise.complete(ledger);
                                }

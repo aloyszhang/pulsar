@@ -116,14 +116,25 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                         int hitCount = 0;
                         log.info("recoverFromSnapshot start topic:{}", topic);
 
-                        MultiMessageIdImpl multiMessageId = (MultiMessageIdImpl) reader.getLastMessageId().get();
-                        MessageIdImpl lastMessageId = null;
+                        //MultiMessageIdImpl multiMessageId = (MultiMessageIdImpl) reader.getLastMessageId().get();
+                        MessageId lastMessageId = reader.getLastMessageId().get();
 
-                        if (multiMessageId.getMap().size() == 1) {
-                            for (Map.Entry<String, MessageId> stringMessageIdEntry : multiMessageId.getMap().entrySet()) {
-                                lastMessageId = (MessageIdImpl) stringMessageIdEntry.getValue();
-                                log.info("recoverFromSnapshot lastMessageId:{}", lastMessageId);
+                        Long lastLedgerId = null;
+                        Long lastEntryId = null;
+                        if (lastMessageId instanceof MultiMessageIdImpl) {
+                            if (((MultiMessageIdImpl) lastMessageId).getMap().size() == 1) {
+                                for (Map.Entry<String, MessageId> stringMessageIdEntry :
+                                        ((MultiMessageIdImpl) lastMessageId).getMap()
+                                                .entrySet()) {
+                                    MessageIdImpl firstMessageId = (MessageIdImpl) stringMessageIdEntry.getValue();
+                                    lastLedgerId = firstMessageId.getLedgerId();
+                                    lastEntryId = firstMessageId.getEntryId();
+                                    log.info("recoverFromSnapshot lastMessageId:{}", lastMessageId);
+                                }
                             }
+                        } else if (lastMessageId instanceof MessageIdAdv) {
+                            lastLedgerId = ((MessageIdAdv) lastMessageId).getLedgerId();
+                            lastEntryId = ((MessageIdAdv) lastMessageId).getEntryId();
                         }
 
                         while (reader.hasMoreEvents()) {
@@ -136,8 +147,8 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
 
                             if (lastMessageId != null) {
                                 int result = ComparisonChain.start()
-                                        .compare(lastMessageId.getLedgerId(), messageId.getLedgerId())
-                                        .compare(lastMessageId.getEntryId(), messageId.getEntryId())
+                                        .compare(lastLedgerId.longValue(), messageId.getLedgerId())
+                                        .compare(lastEntryId.longValue(), messageId.getEntryId())
                                         .result();
 
                                 if (result < 0) {

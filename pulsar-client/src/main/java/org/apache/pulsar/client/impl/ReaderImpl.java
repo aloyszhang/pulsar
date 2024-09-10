@@ -253,4 +253,8 @@ public class ReaderImpl<T> implements Reader<T> {
     public CompletableFuture<Void> seekAsync(long timestamp) {
         return consumer.seekAsync(timestamp);
     }
+
+    public CompletableFuture<MessageId> getLastMessageIdAsync() {
+        return consumer.getLastMessageIdAsync();
+    }
 }

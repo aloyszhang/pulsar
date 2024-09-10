@@ -29,6 +29,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.impl.MultiTopicsReaderImpl;
+import org.apache.pulsar.client.impl.ReaderImpl;
 import org.apache.pulsar.common.naming.TopicName;
 
 @Slf4j
@@ -144,6 +145,8 @@ public class  TransactionBufferSnapshotBaseSystemTopicClient<T> extends SystemTo
             log.info("getLastMessageId reader class:{}", reader.getClass());
             if (reader instanceof MultiTopicsReaderImpl) {
                 return ((MultiTopicsReaderImpl) reader).getLastMessageIdAsync();
+            } else if (reader instanceof ReaderImpl) {
+                return ((ReaderImpl) reader).getLastMessageIdAsync();
             }
 
             return CompletableFuture.completedFuture(null);

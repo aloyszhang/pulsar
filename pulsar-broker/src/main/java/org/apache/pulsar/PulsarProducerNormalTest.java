@@ -22,7 +22,7 @@ public class PulsarProducerNormalTest {
                     .operationTimeout(5, TimeUnit.MINUTES)
                     .build();
 
-            String topic = "persistent://compaction/compaction/compaction_test-partition-0";
+            String topic = "persistent://compaction/compaction_v1/compaction_test-partition-0";
 
             Producer<byte[]> producer = client.newProducer()
                     .topic(topic)

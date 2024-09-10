@@ -141,11 +141,12 @@ public class  TransactionBufferSnapshotBaseSystemTopicClient<T> extends SystemTo
 
         @Override
         public CompletableFuture<MessageId> getLastMessageId() {
+            log.info("getLastMessageId reader class:{}", reader.getClass());
             if (reader instanceof MultiTopicsReaderImpl) {
                 return ((MultiTopicsReaderImpl) reader).getLastMessageIdAsync();
             }
 
-            return CompletableFuture.failedFuture(new RuntimeException());
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override

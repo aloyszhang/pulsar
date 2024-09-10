@@ -116,11 +116,11 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                         int hitCount = 0;
                         log.info("recoverFromSnapshot start topic:{}", topic);
 
-                        MultiMessageIdImpl messageId1 = (MultiMessageIdImpl) reader.getLastMessageId().get();
+                        MultiMessageIdImpl multiMessageId = (MultiMessageIdImpl) reader.getLastMessageId().get();
                         MessageIdImpl lastMessageId = null;
 
-                        if (messageId1.getMap().size() == 1) {
-                            for (Map.Entry<String, MessageId> stringMessageIdEntry : messageId1.getMap().entrySet()) {
+                        if (multiMessageId.getMap().size() == 1) {
+                            for (Map.Entry<String, MessageId> stringMessageIdEntry : multiMessageId.getMap().entrySet()) {
                                 lastMessageId = (MessageIdImpl) stringMessageIdEntry.getValue();
                                 log.info("recoverFromSnapshot lastMessageId:{}", lastMessageId);
                             }

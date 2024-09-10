@@ -116,7 +116,6 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                         int hitCount = 0;
                         log.info("recoverFromSnapshot start topic:{}", topic);
 
-                        //MultiMessageIdImpl multiMessageId = (MultiMessageIdImpl) reader.getLastMessageId().get();
                         MessageId lastMessageId = reader.getLastMessageId().get();
 
                         Long lastLedgerId = null;

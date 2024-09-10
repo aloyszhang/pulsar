@@ -53,7 +53,8 @@ public class CompactorSubscription extends PersistentSubscription {
             compactedTopic.newCompactedLedger(cursor.getMarkDeletedPosition(), compactedLedgerId)
                     .thenAccept(previousContext -> {
                         if (previousContext != null) {
-                            log.info("CompactorSubscription delete ledgerId:{}", previousContext.getLedger().getId());
+                            log.info("CompactorSubscription delete oldLedgerId:{}, newLedgerId:{}",
+                                    previousContext.getLedger().getId(), compactedLedgerId);
                             compactedTopic.deleteCompactedLedger(previousContext.getLedger().getId());
                         }
                     });
@@ -89,7 +90,8 @@ public class CompactorSubscription extends PersistentSubscription {
                                 topicName, subName, position);
                     }
                     if (previousContext != null) {
-                        log.info("acknowledgeMessage delete ledgerId:{}", previousContext.getLedger().getId());
+                        log.info("acknowledgeMessage delete oldLedgerId:{}, newLedgerId:{}",
+                                previousContext.getLedger().getId(), compactedLedgerId);
                         compactedTopic.deleteCompactedLedger(previousContext.getLedger().getId());
                     }
                 }

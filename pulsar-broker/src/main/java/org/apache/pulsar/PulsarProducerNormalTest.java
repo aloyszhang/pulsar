@@ -33,9 +33,9 @@ public class PulsarProducerNormalTest {
             for (int i = 0; i < 2000; i++) {
                 try {
 
-                    String key = "A";
+                    String key = "C";
                     if (System.currentTimeMillis() % 2 == 0) {
-                        key = "B";
+                        key = "D";
                     }
 
                     String message = "My message" + i + " | " + System.currentTimeMillis();

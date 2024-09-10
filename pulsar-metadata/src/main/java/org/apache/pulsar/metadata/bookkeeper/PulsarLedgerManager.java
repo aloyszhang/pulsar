@@ -202,7 +202,7 @@ public class PulsarLedgerManager implements LedgerManager {
         cache.getWithStats(ledgerPath)
                 .thenAccept(optRes -> {
                     if (!optRes.isPresent()) {
-                        log.info("No such ledger: {} at path {}", ledgerId, ledgerPath);
+                        log.error("No such ledger: {} at path {}", ledgerId, ledgerPath);
                         promise.completeExceptionally(new BKException.BKNoSuchLedgerExistsOnMetadataServerException());
                         return;
                     }

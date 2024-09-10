@@ -137,13 +137,16 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                             lastEntryId = ((MessageIdAdv) lastMessageId).getEntryId();
                         }
 
+                        log.info("recoverFromSnapshot start topic:{} lastLedgerId:{},lastEntryId:{}", topic,
+                                lastLedgerId, lastEntryId);
+
                         while (reader.hasMoreEvents()) {
                             Message<TransactionBufferSnapshot> message = reader.readNextAsync()
                                     .get(getSystemClientTbOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             entryCount++;
                             MessageIdAdv messageId = (MessageIdAdv) message.getMessageId();
-                            log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{} {}:{}", topic,
-                                    entryCount, messageId.getLedgerId(), messageId.getEntryId());
+                            log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{} {}:{} time:{}", topic,
+                                    entryCount, messageId.getLedgerId(), messageId.getEntryId(), message.getPublishTime());
 
                             if (lastMessageId != null) {
                                 int result = ComparisonChain.start()

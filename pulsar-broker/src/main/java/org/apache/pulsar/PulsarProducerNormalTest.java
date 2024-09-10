@@ -22,7 +22,7 @@ public class PulsarProducerNormalTest {
                     .operationTimeout(5, TimeUnit.MINUTES)
                     .build();
 
-            String topic = "persistent://compaction/compaction_v1/compaction_test-partition-0";
+            String topic = "persistent://compaction/compaction/compaction_test-partition-0";
 
             Producer<byte[]> producer = client.newProducer()
                     .topic(topic)
@@ -30,7 +30,7 @@ public class PulsarProducerNormalTest {
 
             System.out.println("start");
 
-            for (int i = 0; i < 10000; i++) {
+            for (int i = 0; i < 2000; i++) {
                 try {
 
                     String key = "A";

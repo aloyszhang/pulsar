@@ -28,7 +28,7 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
-import org.apache.pulsar.client.impl.CompactionReaderImpl;
+import org.apache.pulsar.client.impl.MultiTopicsReaderImpl;
 import org.apache.pulsar.common.naming.TopicName;
 
 @Slf4j
@@ -141,8 +141,8 @@ public class  TransactionBufferSnapshotBaseSystemTopicClient<T> extends SystemTo
 
         @Override
         public CompletableFuture<MessageId> getLastMessageId() {
-            if (reader instanceof CompactionReaderImpl) {
-                return ((CompactionReaderImpl) reader).getLastMessageIdAsync();
+            if (reader instanceof MultiTopicsReaderImpl) {
+                return ((MultiTopicsReaderImpl) reader).getLastMessageIdAsync();
             }
 
             return CompletableFuture.failedFuture(new RuntimeException());

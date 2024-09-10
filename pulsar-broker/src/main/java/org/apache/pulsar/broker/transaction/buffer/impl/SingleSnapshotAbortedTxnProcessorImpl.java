@@ -21,6 +21,7 @@ package org.apache.pulsar.broker.transaction.buffer.impl;
 import com.google.common.collect.ComparisonChain;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -36,8 +37,11 @@ import org.apache.pulsar.broker.transaction.buffer.AbortedTxnProcessor;
 import org.apache.pulsar.broker.transaction.buffer.metadata.AbortTxnMetadata;
 import org.apache.pulsar.broker.transaction.buffer.metadata.TransactionBufferSnapshot;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.MessageIdAdv;
 import org.apache.pulsar.client.api.transaction.TxnID;
+import org.apache.pulsar.client.impl.MessageIdImpl;
+import org.apache.pulsar.client.impl.MultiMessageIdImpl;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -62,10 +66,10 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                 .getTransactionBufferSnapshotServiceFactory()
                 .getTxnBufferSnapshotService().getReferenceWriter(TopicName.get(topic.getName()).getNamespaceObject());
         this.takeSnapshotWriter.getFuture().exceptionally((ex) -> {
-                    log.error("{} Failed to create snapshot writer", topic.getName());
-                    topic.close();
-                    return null;
-                });
+            log.error("{} Failed to create snapshot writer", topic.getName());
+            topic.close();
+            return null;
+        });
     }
 
     @Override
@@ -106,34 +110,43 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                 .getTxnBufferSnapshotService()
                 .createReader(TopicName.get(topic.getName())).thenComposeAsync(reader -> {
                     try {
-                    PositionImpl startReadCursorPosition = null;
+                        PositionImpl startReadCursorPosition = null;
 
                         int entryCount = 0;
                         int hitCount = 0;
                         log.info("recoverFromSnapshot start topic:{}", topic);
-                        MessageIdAdv lastMessageId = (MessageIdAdv)reader.getLastMessageId().get();
+
+                        MultiMessageIdImpl messageId1 = (MultiMessageIdImpl) reader.getLastMessageId().get();
+                        MessageIdImpl lastMessageId = null;
+
+                        if (messageId1.getMap().size() == 1) {
+                            for (Map.Entry<String, MessageId> stringMessageIdEntry : messageId1.getMap().entrySet()) {
+                                lastMessageId = (MessageIdImpl) stringMessageIdEntry.getValue();
+                                log.info("recoverFromSnapshot lastMessageId:{}", lastMessageId);
+                            }
+                        }
+
                         while (reader.hasMoreEvents()) {
                             Message<TransactionBufferSnapshot> message = reader.readNextAsync()
                                     .get(getSystemClientTbOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             entryCount++;
-                            log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{}", topic,
-                                    entryCount);
-
                             MessageIdAdv messageId = (MessageIdAdv) message.getMessageId();
+                            log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{} {}:{}", topic,
+                                    entryCount, messageId.getLedgerId(), messageId.getEntryId());
 
-                            int result = ComparisonChain.start()
-                                    .compare(lastMessageId.getLedgerId(), messageId.getLedgerId())
-                                    .compare(lastMessageId.getEntryId(), messageId.getEntryId())
-                                    .result();
+                            if (lastMessageId != null) {
+                                int result = ComparisonChain.start()
+                                        .compare(lastMessageId.getLedgerId(), messageId.getLedgerId())
+                                        .compare(lastMessageId.getEntryId(), messageId.getEntryId())
+                                        .result();
 
-                            if (result < 0) {
-                                log.info(
-                                        "recoverFromSnapshot read entry exceed the original lastMessageId topic:{}, "
-                                                + "entryCount:{} lastMessageId:{}",
-                                        topic, entryCount, lastMessageId);
-                                break;
+                                if (result < 0) {
+                                    log.info("recoverFromSnapshot read entry exceed the original lastMessageId "
+                                                    + "topic:{}, " + "entryCount:{} lastMessageId:{}",
+                                            topic, entryCount, lastMessageId);
+                                    break;
+                                }
                             }
-
                             if (topic.getName().equals(message.getKey())) {
                                 hitCount++;
                                 TransactionBufferSnapshot transactionBufferSnapshot = message.getValue();
@@ -164,7 +177,7 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                     } finally {
                         closeReader(reader);
                     }
-                },  topic.getBrokerService().getPulsar().getTransactionExecutorProvider()
+                }, topic.getBrokerService().getPulsar().getTransactionExecutorProvider()
                         .getExecutor(this));
     }
 

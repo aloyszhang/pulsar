@@ -371,6 +371,7 @@ public class TwoPhaseCompactor extends Compactor {
 
     protected CompletableFuture<Void> deleteLedger(BookKeeper bk, LedgerHandle lh) {
         CompletableFuture<Void> bkf = new CompletableFuture<>();
+        log.info("deleteLedger compactionLedger start ledgerId:{}", lh.getId());
         try {
             bk.asyncDeleteLedger(lh.getId(),
                     (rc, ctx) -> {

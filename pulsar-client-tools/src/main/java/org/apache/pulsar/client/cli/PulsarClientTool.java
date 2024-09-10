@@ -261,7 +261,7 @@ public class PulsarClientTool {
 
     public static void main(String[] args) throws Exception {
 
-/*        args =
+       /* args =
                 ("/Users/atomchchen/source/teg/pulsar2/pulsar/conf/client.conf read -n 0 -rc -m earliest "
                         + "persistent://compaction/compaction/compaction_test-partition-0").split(
                         " ");*/

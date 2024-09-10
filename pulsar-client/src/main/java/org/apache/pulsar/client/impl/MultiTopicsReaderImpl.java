@@ -231,4 +231,8 @@ public class MultiTopicsReaderImpl<T> implements Reader<T> {
     public MultiTopicsConsumerImpl<T> getMultiTopicsConsumer() {
         return multiTopicsConsumer;
     }
+
+    public CompletableFuture<MessageId> getLastMessageIdAsync() {
+        return multiTopicsConsumer.getLastMessageIdAsync();
+    }
 }

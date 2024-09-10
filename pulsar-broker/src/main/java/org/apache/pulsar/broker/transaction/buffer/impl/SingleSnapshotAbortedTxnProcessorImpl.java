@@ -18,6 +18,7 @@
  */
 package org.apache.pulsar.broker.transaction.buffer.impl;
 
+import com.google.common.collect.ComparisonChain;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -35,6 +36,7 @@ import org.apache.pulsar.broker.transaction.buffer.AbortedTxnProcessor;
 import org.apache.pulsar.broker.transaction.buffer.metadata.AbortTxnMetadata;
 import org.apache.pulsar.broker.transaction.buffer.metadata.TransactionBufferSnapshot;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageIdAdv;
 import org.apache.pulsar.client.api.transaction.TxnID;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
@@ -109,12 +111,29 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                         int entryCount = 0;
                         int hitCount = 0;
                         log.info("recoverFromSnapshot start topic:{}", topic);
+                        MessageIdAdv lastMessageId = (MessageIdAdv)reader.getLastMessageId().get();
                         while (reader.hasMoreEvents()) {
                             Message<TransactionBufferSnapshot> message = reader.readNextAsync()
                                     .get(getSystemClientTbOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             entryCount++;
                             log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{}", topic,
                                     entryCount);
+
+                            MessageIdAdv messageId = (MessageIdAdv) message.getMessageId();
+
+                            int result = ComparisonChain.start()
+                                    .compare(lastMessageId.getLedgerId(), messageId.getLedgerId())
+                                    .compare(lastMessageId.getEntryId(), messageId.getEntryId())
+                                    .result();
+
+                            if (result < 0) {
+                                log.info(
+                                        "recoverFromSnapshot read entry exceed the original lastMessageId topic:{}, "
+                                                + "entryCount:{} lastMessageId:{}",
+                                        topic, entryCount, lastMessageId);
+                                break;
+                            }
+
                             if (topic.getName().equals(message.getKey())) {
                                 hitCount++;
                                 TransactionBufferSnapshot transactionBufferSnapshot = message.getValue();

@@ -268,7 +268,7 @@ public class CompactedTopicImpl implements CompactedTopic {
                                      log.warn("Error deleting compacted topic ledger {}",
                                               id, BKException.create(rc));
                                  } else {
-                                     log.debug("Compacted topic ledger deleted successfully");
+                                     log.info("Compacted topic ledger deleted successfully ledger:{}", id);
                                  }
                                  promise.complete(null); // don't propagate any error
                              }, null);

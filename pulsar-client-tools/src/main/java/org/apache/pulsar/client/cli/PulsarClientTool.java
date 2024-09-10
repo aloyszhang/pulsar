@@ -260,6 +260,12 @@ public class PulsarClientTool {
     }
 
     public static void main(String[] args) throws Exception {
+
+/*        args =
+                ("/Users/atomchchen/source/teg/pulsar2/pulsar/conf/client.conf read -n 0 -rc -m earliest "
+                        + "persistent://compaction/compaction/compaction_test-partition-0").split(
+                        " ");*/
+
         if (args.length == 0) {
             System.out.println("Usage: pulsar-client CONF_FILE_PATH [options] [command] [command options]");
             System.exit(1);

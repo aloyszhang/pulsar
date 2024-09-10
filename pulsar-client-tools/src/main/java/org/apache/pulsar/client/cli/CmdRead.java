@@ -184,7 +184,7 @@ public class CmdRead extends AbstractCmdConsume {
                         try {
                             numMessagesRead += 1;
                             System.out.println(
-                                    "read success count:" + numMessagesRead + "publishTime:" + msg.getPublishTime());
+                                    "read success count:" + numMessagesRead + "publishTime:" + msg.getPublishTime() + " partition:" + msg.getTopicName());
                             if (!hideContent) {
                                 System.out.println(MESSAGE_BOUNDARY);
                                 String output = this.interpretMessage(msg, displayHex);

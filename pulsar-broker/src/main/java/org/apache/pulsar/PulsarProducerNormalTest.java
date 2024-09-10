@@ -17,44 +17,38 @@ public class PulsarProducerNormalTest {
 
             PulsarClient client = PulsarClient.builder()
                     .enableTransaction(true)
-                    .serviceUrl("pulsar://test.pulsar.com:6651").connectionsPerBroker(1)
+                    .serviceUrl("pulsar://test.pulsar.com:6650").connectionsPerBroker(1)
                     .ioThreads(1)
                     .operationTimeout(5, TimeUnit.MINUTES)
                     .build();
 
-            String topic = "persistent://perf_test/perf_test/perf_test_8888";
+            String topic = "persistent://compaction/compaction/compaction_test-partition-0";
 
             Producer<byte[]> producer = client.newProducer()
                     .topic(topic)
                     .create();
 
-
-            // Transaction transaction = client.newTransaction().build().get();
-
             System.out.println("start");
 
-            for (int i = 0; i < 100000; i++) {
+            for (int i = 0; i < 10000; i++) {
                 try {
+
+                    String key = "A";
+                    if (System.currentTimeMillis() % 2 == 0) {
+                        key = "B";
+                    }
 
                     String message = "My message" + i + " | " + System.currentTimeMillis();
                     long start = System.currentTimeMillis();
-                    MessageId send =
-                            producer.newMessage().key(String.valueOf(i)).value(message.getBytes())
-                                    .send();
+                    MessageId send = producer.newMessage().key(key).value(message.getBytes()).send();
                     long end = System.currentTimeMillis();
                     System.err.println(
-                            (end - start) + " --send ok" + send + "|" + producer.getLastDisconnectedTimestamp()
+                            (end - start) + " --send ok" + key + " | " + send + "|" + producer.getLastDisconnectedTimestamp()
                                     + "|" + producer.getLastSequenceId()
                                     + "|" + producer.getTopic()
                                     + "|" + producer.getStats() + "--" + message);
 
                     Thread.sleep(1);
-
-                    if (i % 10 == 0) {
-                        // transaction.commit();
-                        System.out.println("commit ");
-                        // transaction = client.newTransaction().build().get();
-                    }
                 } catch (Throwable throwable) {
                     throwable.printStackTrace();
                 }

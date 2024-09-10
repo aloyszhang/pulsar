@@ -367,6 +367,7 @@ public class StrategicTwoPhaseCompactor extends TwoPhaseCompactor {
                 .thenCompose((v) -> closeLedger(ledger))
                 .whenComplete((v, exception) -> {
                     if (exception != null) {
+                        log.info("deleting compactionLedger ledgerId:{}", ledger.getId());
                         deleteLedger(bk, ledger).whenComplete((res2, exception2) -> {
                             if (exception2 != null) {
                                 log.error("Cleanup of ledger {} for failed", ledger, exception2);

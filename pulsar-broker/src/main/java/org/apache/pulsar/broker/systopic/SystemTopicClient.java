@@ -188,6 +188,15 @@ public interface SystemTopicClient<T> {
          * @return system topic
          */
         SystemTopicClient<T> getSystemTopic();
+
+        /**
+         * getLastMessageId
+         * @return system topic
+         */
+        default CompletableFuture<MessageId> getLastMessageId(){
+            return CompletableFuture.failedFuture(
+                    new PulsarClientException.NotSupportedException("getLastMessageId not support"));
+        }
     }
 
 }

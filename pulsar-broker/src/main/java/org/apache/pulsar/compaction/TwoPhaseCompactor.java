@@ -378,6 +378,7 @@ public class TwoPhaseCompactor extends Compactor {
                             bkf.completeExceptionally(BKException.create(rc));
                         } else {
                             bkf.complete(null);
+                            log.info("deleteLedger compactionLedger success ledgerId:{}", lh.getId());
                         }
                     }, null);
         } catch (Throwable t) {

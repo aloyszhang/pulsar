@@ -50,7 +50,8 @@ public class CompactorSubscription extends PersistentSubscription {
         Map<String, Long> properties = cursor.getProperties();
         if (properties.containsKey(Compactor.COMPACTED_TOPIC_LEDGER_PROPERTY)) {
             long compactedLedgerId = properties.get(Compactor.COMPACTED_TOPIC_LEDGER_PROPERTY);
-            log.info("CompactorSubscription newCompactedLedger on init :{}, topics:{}", compactedLedgerId, topic);
+            log.info("CompactorSubscription newCompactedLedger on init :{}, topics:{}, subscriptionName",
+                    compactedLedgerId, topic, subscriptionName);
             compactedTopic.newCompactedLedger(cursor.getMarkDeletedPosition(), compactedLedgerId)
                     .thenAccept(previousContext -> {
                         if (previousContext != null) {
@@ -121,6 +122,7 @@ public class CompactorSubscription extends PersistentSubscription {
             return compactedTopicContextFuture.thenCompose(context -> {
                 long compactedLedgerId = context.getLedger().getId();
                 ((CompactedTopicImpl) compactedTopic).reset();
+                log.info("cleanCompactedLedger compactedLedgerId:{}", compactedLedgerId);
                 return compactedTopic.deleteCompactedLedger(compactedLedgerId);
             });
         } else {

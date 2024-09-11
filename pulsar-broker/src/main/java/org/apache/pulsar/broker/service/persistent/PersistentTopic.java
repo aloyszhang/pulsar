@@ -351,6 +351,8 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 // ignore it for now and let the message dedup logic to take care of it
             } else {
                 final String subscriptionName = Codec.decode(cursor.getName());
+                log.info("PersistentTopic createPersistentSubscription subscriptionName:{} topic:{}", subscriptionName,
+                        topic);
                 subscriptions.put(subscriptionName, createPersistentSubscription(subscriptionName, cursor,
                         PersistentSubscription.isCursorFromReplicatedSubscription(cursor),
                         cursor.getCursorProperties()));
@@ -517,6 +519,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                             "Another unload subscriber[%s] has been finished, do not repeat call.", subName)));
                 }
                 sub.getCursor().rewind();
+                log.info("unloadSubscription createPersistentSubscription sub:{}", sub.getName());
                 PersistentSubscription subNew = PersistentTopic.this.createPersistentSubscription(sub.getName(),
                         sub.getCursor(), sub.isReplicated(), sub.getSubscriptionProperties());
                 subscriptions.put(subName, subNew);
@@ -1033,9 +1036,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 new OpenCursorCallback() {
             @Override
             public void openCursorComplete(ManagedCursor cursor, Object ctx) {
-                if (log.isDebugEnabled()) {
-                    log.debug("[{}][{}] Opened cursor", topic, subscriptionName);
-                }
+                log.info("[{}][{}] getDurableSubscription openCursorComplete", topic, subscriptionName);
 
                 PersistentSubscription subscription = subscriptions.get(subscriptionName);
                 if (subscription == null) {

@@ -50,6 +50,7 @@ public class CompactorSubscription extends PersistentSubscription {
         Map<String, Long> properties = cursor.getProperties();
         if (properties.containsKey(Compactor.COMPACTED_TOPIC_LEDGER_PROPERTY)) {
             long compactedLedgerId = properties.get(Compactor.COMPACTED_TOPIC_LEDGER_PROPERTY);
+            log.info("CompactorSubscription newCompactedLedger on init :{}, topics:{}", compactedLedgerId, topic);
             compactedTopic.newCompactedLedger(cursor.getMarkDeletedPosition(), compactedLedgerId)
                     .thenAccept(previousContext -> {
                         if (previousContext != null) {

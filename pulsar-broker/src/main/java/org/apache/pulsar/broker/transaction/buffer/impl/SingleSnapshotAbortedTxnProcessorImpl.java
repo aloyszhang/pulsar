@@ -143,6 +143,7 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                             Message<TransactionBufferSnapshot> message = reader.readNextAsync()
                                     .get(getSystemClientTbOperationTimeoutMs(), TimeUnit.MILLISECONDS);
                             entryCount++;
+                            long startTime = System.currentTimeMillis();
                             MessageIdAdv messageId = (MessageIdAdv) message.getMessageId();
                             log.info("recoverFromSnapshot read entry success topic:{}, entryCount:{} {}:{} time:{}", topic,
                                     entryCount, messageId.getLedgerId(), messageId.getEntryId(), message.getPublishTime());
@@ -172,6 +173,8 @@ public class SingleSnapshotAbortedTxnProcessorImpl implements AbortedTxnProcesso
                                 log.info("recoverFromSnapshot read entry hit success topic:{}, hitCount:{}", topic,
                                         hitCount);
                             }
+                            log.info("recoverFromSnapshot read entry success end topic:{}, cost:{}", topic,
+                                    System.currentTimeMillis() - startTime);
                         }
                         log.info("recoverFromSnapshot end topic:{}, entryCount={},hitCount={}", topic, entryCount,
                                 hitCount);

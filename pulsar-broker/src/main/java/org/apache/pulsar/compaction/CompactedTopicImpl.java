@@ -84,6 +84,7 @@ public class CompactedTopicImpl implements CompactedTopic {
 
     @Override
     public CompletableFuture<Void> deleteCompactedLedger(long compactedLedgerId) {
+        log.info("deleteCompactedLedger compactedLedgerId:{}", compactedLedgerId);
         return tryDeleteCompactedLedger(bk, compactedLedgerId);
     }
 

@@ -57,8 +57,16 @@ public class CompactorSubscription extends PersistentSubscription {
                         if (previousContext != null) {
                             log.info("CompactorSubscription delete oldLedgerId:{}, newLedgerId:{}",
                                     previousContext.getLedger().getId(), compactedLedgerId);
-                            compactedTopic.deleteCompactedLedger(previousContext.getLedger().getId());
+                            if (previousContext.getLedger().getId() != compactedLedgerId) {
+                                compactedTopic.deleteCompactedLedger(previousContext.getLedger().getId());
+                            }
                         }
+                    }).exceptionally(e -> {
+                        // give chance to retry
+                        log.error("CompactorSubscription newCompactedLedger error :{}, topics:{}, subscriptionName",
+                                compactedLedgerId, topic, subscriptionName, e);
+                        ((CompactedTopicImpl) compactedTopic).reset();
+                        return null;
                     });
         }
     }

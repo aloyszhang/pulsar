@@ -1036,10 +1036,10 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 new OpenCursorCallback() {
             @Override
             public void openCursorComplete(ManagedCursor cursor, Object ctx) {
-                log.info("[{}][{}] getDurableSubscription openCursorComplete", topic, subscriptionName);
 
                 PersistentSubscription subscription = subscriptions.get(subscriptionName);
                 if (subscription == null) {
+                    log.info("[{}][{}] getDurableSubscription new openCursorComplete load", topic, subscriptionName);
                     subscription = subscriptions.computeIfAbsent(subscriptionName,
                                   name -> createPersistentSubscription(subscriptionName, cursor,
                                           replicated, subscriptionProperties));

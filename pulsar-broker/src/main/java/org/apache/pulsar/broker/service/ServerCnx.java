@@ -2069,6 +2069,8 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         }
     }
 
+    public static ThreadLocal<GetLastMessageTime> timeTL = new ThreadLocal<>();
+
     @Override
     protected void handleGetLastMessageId(CommandGetLastMessageId getLastMessageId) {
         GetLastMessageTime time = new GetLastMessageTime();
@@ -2088,6 +2090,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             topic.checkIfTransactionBufferRecoverCompletely(true)
                  .thenCompose(a -> {
                      time.time2 = System.currentTimeMillis();
+                     timeTL.set(time);
                      CompletableFuture<Position> position = topic.getLastDispatchablePosition();
                      time.time3 = System.currentTimeMillis();
                      return position;

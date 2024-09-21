@@ -2232,7 +2232,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                         markDeletePosition != null ? markDeletePosition.getEntryId() : -1));
                 time.time8 = System.currentTimeMillis();
                 long cost = time.time8 - time.startTime;
-                log.info("handleGetLastMessageId success cost:{}", cost);
+                log.info("handleGetLastMessageId success cost:{} {}", cost, time.times);
                 if (cost > 1000) {
                     log.info("handleGetLastMessageId success cost:{} gt 1000 {}", cost, time);
                 }

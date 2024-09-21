@@ -21,12 +21,18 @@ package org.apache.pulsar.admin.cli;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.Parameters;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.transaction.TxnID;
+import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 import org.apache.pulsar.common.policies.data.TransactionCoordinatorInfo;
+import org.apache.pulsar.common.policies.data.TransactionCoordinatorInternalStats;
 import org.apache.pulsar.common.util.RelativeTimeUtil;
 
 @Parameters(commandDescription = "Operations on transactions")
@@ -237,6 +243,38 @@ public class CmdTransactions extends CmdBase {
         }
     }
 
+    @Parameters(commandDescription = "Get the position stats in transaction pending ack")
+    private class PrintLedgerInfo extends CliCommand {
+
+        @Parameter(names = {"-lf", "--lf"}, description = "lf", required = true)
+        private String lf;
+
+        @Override
+        void run() throws Exception {
+
+            String TRANSACTION_LOG_PREFIX = "transaction_coordinator_assign";
+
+            String topic = "pulsar/system/" + TRANSACTION_LOG_PREFIX;
+
+            int partitions = getAdmin().topics().getPartitionedTopicMetadata(topic).partitions;
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < partitions; i++) {
+                TransactionCoordinatorInternalStats coordinatorInternalStats =
+                        getAdmin().transactions().getCoordinatorInternalStats(i, false);
+
+                List<ManagedLedgerInternalStats.LedgerInfo> ledgers =
+                        coordinatorInternalStats.transactionLogStats.managedLedgerInternalStats.ledgers;
+
+                for (ManagedLedgerInternalStats.LedgerInfo ledger : ledgers) {
+                    sb.append(ledger.ledgerId);
+                    sb.append("\n");
+                }
+            }
+
+            Files.write(Paths.get(lf), sb.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
 
     public CmdTransactions(Supplier<PulsarAdmin> admin) {
         super("transactions", admin);
@@ -252,6 +290,7 @@ public class CmdTransactions extends CmdBase {
         jcommander.addCommand("scale-transactionCoordinators", new ScaleTransactionCoordinators());
         jcommander.addCommand("position-stats-in-pending-ack", new GetPositionStatsInPendingAck());
         jcommander.addCommand("coordinators-list", new ListTransactionCoordinators());
+        jcommander.addCommand("print-ledger-info", new PrintLedgerInfo());
 
     }
 }

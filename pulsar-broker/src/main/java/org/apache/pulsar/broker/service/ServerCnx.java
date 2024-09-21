@@ -2071,9 +2071,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
 
     @Override
     protected void handleGetLastMessageId(CommandGetLastMessageId getLastMessageId) {
+        GetLastMessageTime time = new GetLastMessageTime();
+
+        time.startTime = System.currentTimeMillis();
         checkArgument(state == State.Connected);
 
-        long startTime = System.currentTimeMillis();
         CompletableFuture<Consumer> consumerFuture = consumers.get(getLastMessageId.getConsumerId());
 
         if (consumerFuture != null && consumerFuture.isDone() && !consumerFuture.isCompletedExceptionally()) {
@@ -2081,9 +2083,17 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             long requestId = getLastMessageId.getRequestId();
 
             Topic topic = consumer.getSubscription().getTopic();
+
+            time.time1 = System.currentTimeMillis();
             topic.checkIfTransactionBufferRecoverCompletely(true)
-                 .thenCompose(__ -> topic.getLastDispatchablePosition())
+                 .thenCompose(a -> {
+                     time.time2 = System.currentTimeMillis();
+                     CompletableFuture<Position> position = topic.getLastDispatchablePosition();
+                     time.time3 = System.currentTimeMillis();
+                     return position;
+                 })
                  .thenApply(lastPosition -> {
+                     time.time4 = System.currentTimeMillis();
                      int partitionIndex = TopicName.getPartitionIndex(topic.getName());
 
                      Position markDeletePosition = null;
@@ -2100,12 +2110,12 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                              requestId,
                              consumer.getSubscription().getName(),
                              consumer.readCompacted(),
-                             startTime);
+                             time);
                     return null;
                  }).exceptionally(e -> {
                      writeAndFlush(Commands.newError(getLastMessageId.getRequestId(),
                              ServerError.UnknownError, "Failed to recover Transaction Buffer."));
-                        long cost = System.currentTimeMillis() - startTime;
+                        long cost = System.currentTimeMillis() - time.startTime;
                         log.error("handleGetLastMessageId error Failed to recover Transaction Buffer cost:{}", cost);
                         if (cost > 1000) {
                             log.info("handleGetLastMessageId error Consumer not found cost:{} gt 1000", cost);
@@ -2116,7 +2126,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         } else {
             writeAndFlush(Commands.newError(getLastMessageId.getRequestId(),
                     ServerError.MetadataError, "Consumer not found"));
-            long cost = System.currentTimeMillis() - startTime;
+            long cost = System.currentTimeMillis() - time.startTime;
             log.error("handleGetLastMessageId error Consumer not found cost:{}", cost);
             if (cost > 1000) {
                 log.info("handleGetLastMessageId error Consumer not found cost:{} gt 1000", cost);
@@ -2132,7 +2142,8 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             long requestId,
             String subscriptionName,
             boolean readCompacted,
-            long startTime) {
+            GetLastMessageTime time) {
+        time.time5 = System.currentTimeMillis();
         PersistentTopic persistentTopic = (PersistentTopic) topic;
         ManagedLedgerImpl ml = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
 
@@ -2165,10 +2176,12 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
 
         // For a valid position, we read the entry out and parse the batch size from its metadata.
         CompletableFuture<Entry> entryFuture = new CompletableFuture<>();
+        time.time6 = System.currentTimeMillis();
         ml.asyncReadEntry(lastPosition, new AsyncCallbacks.ReadEntryCallback() {
             @Override
             public void readEntryComplete(Entry entry, Object ctx) {
                 entryFuture.complete(entry);
+                time.time7 = System.currentTimeMillis();
             }
 
             @Override
@@ -2194,12 +2207,12 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                     writeAndFlush(Commands.newError(
                             requestId, ServerError.MetadataError,
                             "Failed to get batch size for entry " + e.getMessage()));
-                    long cost = System.currentTimeMillis() - startTime;
+                    long cost = System.currentTimeMillis() - time.startTime;
                     log.error("handleGetLastMessageId error Failed to get batch size for entry cost:{}",
                             cost);
                     if (cost > 1000) {
-                        log.info("handleGetLastMessageId error Failed to get batch size for entry cost:{} gt 1000",
-                                cost);
+                        log.info("handleGetLastMessageId error Failed to get batch size for entry cost:{} gt 1000 {}",
+                                cost, time);
                     }
                 }
             } else {
@@ -2214,10 +2227,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                         lastPosition.getEntryId(), partitionIndex, largestBatchIndex,
                         markDeletePosition != null ? markDeletePosition.getLedgerId() : -1,
                         markDeletePosition != null ? markDeletePosition.getEntryId() : -1));
-                long cost = System.currentTimeMillis() - startTime;
+                time.time8 = System.currentTimeMillis();
+                long cost = time.time8 - time.startTime;
                 log.info("handleGetLastMessageId success cost:{}", cost);
                 if (cost > 1000) {
-                    log.info("handleGetLastMessageId success cost:{} gt 1000", cost);
+                    log.info("handleGetLastMessageId success cost:{} gt 1000 {}", cost, time);
                 }
             }
         });

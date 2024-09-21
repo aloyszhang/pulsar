@@ -282,6 +282,11 @@ public class PulsarAdminTool {
 
     @VisibleForTesting
     public static PulsarAdminTool execute(String[] args) throws Exception {
+
+/*
+        args = "/Users/atomchchen/source/teg/pulsar2/pulsar/conf/client.conf transactions print-ledger-info -lf /Users/atomchchen/Desktop/tmp/ledgers.txt".split(" ");
+*/
+
         lastExitCode = 0;
         if (args.length == 0) {
             System.out.println("Usage: pulsar-admin CONF_FILE_PATH [options] [command] [command options]");

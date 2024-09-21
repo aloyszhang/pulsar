@@ -114,6 +114,8 @@ public abstract class AbstractCmdConsume {
         }
 
         sb.append("key:[").append(key).append("], ");
+        sb.append("publishTime:[").append(message.getPublishTime()).append("], ");
+        sb.append("eventTime:[").append(message.getEventTime()).append("], ");
         if (!properties.isEmpty()) {
             sb.append("properties:").append(properties).append(", ");
         }

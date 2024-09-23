@@ -3385,7 +3385,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
     @Override
     public CompletableFuture<MessageId> getLastMessageId() {
         CompletableFuture<MessageId> completableFuture = new CompletableFuture<>();
-        PositionImpl position = (PositionImpl) ledger.getLastConfirmedEntry();
+        PositionImpl position = getMaxReadPosition();
         String name = getName();
         int partitionIndex = TopicName.getPartitionIndex(name);
         if (log.isDebugEnabled()) {

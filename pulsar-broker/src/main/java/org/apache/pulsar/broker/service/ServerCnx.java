@@ -2608,9 +2608,6 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             }));
     }
 
-
-    public static ConcurrentHashMap<TxnID, String> logSet = new ConcurrentHashMap();
-
     @Override
     protected void handleAddPartitionToTxn(CommandAddPartitionToTxn command) {
         checkArgument(state == State.Connected);
@@ -2627,8 +2624,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         if (partitionsList != null) {
             for (String partition : partitionsList) {
                 if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
-                    logSet.putIfAbsent(txnID, partition);
-                    log.info("handleAddPartitionToTxn txnID:{}, tp:{} size:{}", txnID, partition, logSet.size());
+                    log.info("handleAddPartitionToTxn txnID:{}, tp:{} size:{}", txnID, partition);
                 }
                 break;
             }
@@ -2694,10 +2690,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         TxnID txnID = new TxnID(command.getTxnidMostBits(), command.getTxnidLeastBits());
         final TransactionCoordinatorID tcId = TransactionCoordinatorID.get(command.getTxnidMostBits());
 
-        String tp = ServerCnx.logSet.get(txnID);
-        if (tp != null) {
-            log.info("handleEndTxn txnId:{}, topics:{}", txnID, tp);
-        }
+        log.info("handleEndTxn txnId:{} txnAction:{}", txnID, txnAction);
 
         if (!checkTransactionEnableAndSendError(requestId)) {
             return;

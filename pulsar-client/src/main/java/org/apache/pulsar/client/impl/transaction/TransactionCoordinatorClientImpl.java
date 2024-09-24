@@ -233,6 +233,8 @@ public class TransactionCoordinatorClientImpl implements TransactionCoordinatorC
 
     @Override
     public CompletableFuture<Void> commitAsync(TxnID txnID) {
+        LOG.info("commitAsync txnID:{}.", txnID);
+
         TransactionMetaStoreHandler handler = handlerMap.get(txnID.getMostSigBits());
         if (handler == null) {
             return FutureUtil.failedFuture(

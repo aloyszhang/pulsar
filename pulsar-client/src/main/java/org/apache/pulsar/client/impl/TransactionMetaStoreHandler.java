@@ -469,9 +469,7 @@ public class TransactionMetaStoreHandler extends HandlerState
     }
 
     public CompletableFuture<Void> endTxnAsync(TxnID txnID, TxnAction action) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("End txn {}, action {}", txnID, action);
-        }
+        LOG.info("End txn {}, action {}", txnID, action);
         CompletableFuture<Void> callback = new CompletableFuture<>();
         if (!canSendRequest(callback)) {
             return callback;

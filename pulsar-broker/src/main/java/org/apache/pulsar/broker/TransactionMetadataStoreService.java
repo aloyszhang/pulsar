@@ -339,11 +339,16 @@ public class TransactionMetadataStoreService {
         }
         getTxnMeta(txnID)
                 .thenCompose(txnMeta -> {
-                    String tp = ServerCnx.logSet.get(txnID);
-                    if (tp != null) {
-                        ServerCnx.logSet.remove(txnID);
-                        LOG.info("endTransaction txnId:{},txnAction{}, status:{}, topics:{} size:{}", txnID, txnAction,
-                                txnMeta.status(), tp, ServerCnx.logSet.size());
+                    List<String> partitions = txnMeta.producedPartitions();
+                    if (partitions != null) {
+                        for (String partition : partitions) {
+                            if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
+                                LOG.info("endTransaction txnId:{},txnAction{}, status:{}, topics:{}", txnID, txnAction,
+                                        txnMeta.status(),
+                                        partitions);
+                            }
+                            break;
+                        }
                     }
 
                     if (txnMeta.status() == TxnStatus.OPEN) {
@@ -406,10 +411,16 @@ public class TransactionMetadataStoreService {
     public void endTransactionForTimeout(TxnID txnID) {
         getTxnMeta(txnID).thenCompose(txnMeta -> {
 
-            String tp = ServerCnx.logSet.get(txnID);
-            if (tp != null) {
-                LOG.info("endTransactionForTimeout txnId:{},timeout{}, topics:{}", txnID, txnMeta.getTimeoutAt(),
-                        tp);
+            List<String> partitions = txnMeta.producedPartitions();
+            if (partitions != null) {
+                for (String partition : partitions) {
+                    if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
+                        LOG.info("endTransactionForTimeout txnId:{},timeout{},time:{}, topics:{}", txnID,
+                                txnMeta.getTimeoutAt(), txnMeta.getOpenTimestamp(),
+                                partitions);
+                    }
+                    break;
+                }
             }
 
             if (txnMeta.status() == TxnStatus.OPEN) {

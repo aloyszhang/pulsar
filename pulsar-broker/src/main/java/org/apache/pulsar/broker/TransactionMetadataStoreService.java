@@ -332,12 +332,29 @@ public class TransactionMetadataStoreService {
             default:
                 TransactionCoordinatorException.UnsupportedTxnActionException exception =
                         new TransactionCoordinatorException.UnsupportedTxnActionException(txnID, txnAction);
-                LOG.error(exception.getMessage());
+                LOG.error("endTransaction" + exception.getMessage());
                 future.completeExceptionally(exception);
                 return;
         }
         getTxnMeta(txnID)
                 .thenCompose(txnMeta -> {
+                    boolean log = false;
+                    List<String> partitions = txnMeta.producedPartitions();
+                    if (partitions != null) {
+                        for (String partition : partitions) {
+                            if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
+                                log = true;
+                            }
+                            break;
+                        }
+
+                        if (log) {
+                            LOG.info("endTransaction txnId:{},txnAction{}, status:{}, topics:{}", txnID, txnAction,
+                                    txnMeta.status(),
+                                    partitions);
+                        }
+                    }
+
                     if (txnMeta.status() == TxnStatus.OPEN) {
                         return updateTxnStatus(txnID, newStatus, TxnStatus.OPEN, isTimeout)
                                 .thenCompose(__ -> endTxnInTransactionBuffer(txnID, txnAction));
@@ -397,6 +414,22 @@ public class TransactionMetadataStoreService {
 
     public void endTransactionForTimeout(TxnID txnID) {
         getTxnMeta(txnID).thenCompose(txnMeta -> {
+            boolean log = false;
+            List<String> partitions = txnMeta.producedPartitions();
+            if (partitions != null) {
+                for (String partition : partitions) {
+                    if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
+                        log = true;
+                    }
+                    break;
+                }
+
+                if (log) {
+                    LOG.info("endTransactionForTimeout txnId:{},timeout{}, topics:{}", txnID, txnMeta.getTimeoutAt(),
+                            partitions);
+                }
+            }
+
             if (txnMeta.status() == TxnStatus.OPEN) {
                 return endTransaction(txnID, TxnAction.ABORT_VALUE, true);
             } else {

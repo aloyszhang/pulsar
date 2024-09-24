@@ -56,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -2607,6 +2608,9 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             }));
     }
 
+
+    public static ConcurrentHashMap<TxnID, String> logSet = new ConcurrentHashMap();
+
     @Override
     protected void handleAddPartitionToTxn(CommandAddPartitionToTxn command) {
         checkArgument(state == State.Connected);
@@ -2618,6 +2622,16 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             partitionsList.forEach(partition ->
                     log.debug("Receive add published partition to txn request {} "
                             + "from {} with txnId {}, topic: [{}]", requestId, remoteAddress, txnID, partition));
+        }
+
+        if (partitionsList != null) {
+            for (String partition : partitionsList) {
+                if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
+                    logSet.putIfAbsent(txnID, partition);
+                    log.info("handleAddPartitionToTxn txnID:{}, tp:{} size:{}", txnID, partition, logSet.size());
+                }
+                break;
+            }
         }
 
         if (!checkTransactionEnableAndSendError(requestId)) {
@@ -2679,6 +2693,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         final int txnAction = command.getTxnAction().getValue();
         TxnID txnID = new TxnID(command.getTxnidMostBits(), command.getTxnidLeastBits());
         final TransactionCoordinatorID tcId = TransactionCoordinatorID.get(command.getTxnidMostBits());
+
+        String tp = ServerCnx.logSet.get(txnID);
+        if (tp != null) {
+            log.info("handleEndTxn txnId:{}, topics:{}", txnID, tp);
+        }
 
         if (!checkTransactionEnableAndSendError(requestId)) {
             return;

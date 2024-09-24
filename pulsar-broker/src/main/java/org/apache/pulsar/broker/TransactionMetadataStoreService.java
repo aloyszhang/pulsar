@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.pulsar.broker.service.BrokerServiceException.ServiceUnitNotReadyException;
+import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.transaction.exception.coordinator.TransactionCoordinatorException;
 import org.apache.pulsar.broker.transaction.recover.TransactionRecoverTrackerImpl;
 import org.apache.pulsar.broker.transaction.timeout.TransactionTimeoutTrackerFactoryImpl;
@@ -332,27 +333,17 @@ public class TransactionMetadataStoreService {
             default:
                 TransactionCoordinatorException.UnsupportedTxnActionException exception =
                         new TransactionCoordinatorException.UnsupportedTxnActionException(txnID, txnAction);
-                LOG.error("endTransaction" + exception.getMessage());
+                LOG.error("endTransaction error " + exception.getMessage());
                 future.completeExceptionally(exception);
                 return;
         }
         getTxnMeta(txnID)
                 .thenCompose(txnMeta -> {
-                    boolean log = false;
-                    List<String> partitions = txnMeta.producedPartitions();
-                    if (partitions != null) {
-                        for (String partition : partitions) {
-                            if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
-                                log = true;
-                            }
-                            break;
-                        }
-
-                        if (log) {
-                            LOG.info("endTransaction txnId:{},txnAction{}, status:{}, topics:{}", txnID, txnAction,
-                                    txnMeta.status(),
-                                    partitions);
-                        }
+                    String tp = ServerCnx.logSet.get(txnID);
+                    if (tp != null) {
+                        ServerCnx.logSet.remove(txnID);
+                        LOG.info("endTransaction txnId:{},txnAction{}, status:{}, topics:{} size:{}", txnID, txnAction,
+                                txnMeta.status(), tp, ServerCnx.logSet.size());
                     }
 
                     if (txnMeta.status() == TxnStatus.OPEN) {
@@ -414,20 +405,11 @@ public class TransactionMetadataStoreService {
 
     public void endTransactionForTimeout(TxnID txnID) {
         getTxnMeta(txnID).thenCompose(txnMeta -> {
-            boolean log = false;
-            List<String> partitions = txnMeta.producedPartitions();
-            if (partitions != null) {
-                for (String partition : partitions) {
-                    if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
-                        log = true;
-                    }
-                    break;
-                }
 
-                if (log) {
-                    LOG.info("endTransactionForTimeout txnId:{},timeout{}, topics:{}", txnID, txnMeta.getTimeoutAt(),
-                            partitions);
-                }
+            String tp = ServerCnx.logSet.get(txnID);
+            if (tp != null) {
+                LOG.info("endTransactionForTimeout txnId:{},timeout{}, topics:{}", txnID, txnMeta.getTimeoutAt(),
+                        tp);
             }
 
             if (txnMeta.status() == TxnStatus.OPEN) {

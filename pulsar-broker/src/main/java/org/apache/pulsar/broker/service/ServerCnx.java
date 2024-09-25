@@ -2212,11 +2212,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                             requestId, ServerError.MetadataError,
                             "Failed to get batch size for entry " + e.getMessage()));
                     long cost = System.currentTimeMillis() - time.startTime;
-                    log.error("handleGetLastMessageId error Failed to get batch size for entry cost:{}",
-                            cost);
+                    log.error("handleGetLastMessageId error Failed to get batch size for entry cost:{}-{}",
+                            cost, persistentTopic.topic);
                     if (cost > 1000) {
-                        log.info("handleGetLastMessageId error Failed to get batch size for entry cost:{} gt 1000 {}",
-                                cost, time);
+                        log.info("handleGetLastMessageId error Failed to get batch size for entry cost:{} gt 1000 {}-{}",
+                                cost, time, persistentTopic.topic);
                     }
                 }
             } else {
@@ -2632,7 +2632,6 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         verifyTxnOwnership(txnID)
                 .thenCompose(isOwner -> {
                     if (!isOwner) {
-                        return failedFutureTxnNotOwned(txnID);
                     }
                     return transactionMetadataStoreService
                             .addProducedPartitionToTxn(txnID, partitionsList);

@@ -339,18 +339,8 @@ public class TransactionMetadataStoreService {
         }
         getTxnMeta(txnID)
                 .thenCompose(txnMeta -> {
-                    List<String> partitions = txnMeta.producedPartitions();
-                    if (partitions != null) {
-                        for (String partition : partitions) {
-                            if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
-                                LOG.info("endTransaction txnId:{},txnAction{}, status:{}, topics:{}", txnID, txnAction,
-                                        txnMeta.status(),
-                                        partitions);
-                            }
-                            break;
-                        }
-                    }
-
+                    LOG.info("endTransaction txnId:{},txnAction{}, status:{}", txnID, txnAction,
+                            txnMeta.status());
                     if (txnMeta.status() == TxnStatus.OPEN) {
                         return updateTxnStatus(txnID, newStatus, TxnStatus.OPEN, isTimeout)
                                 .thenCompose(__ -> endTxnInTransactionBuffer(txnID, txnAction));
@@ -413,14 +403,9 @@ public class TransactionMetadataStoreService {
 
             List<String> partitions = txnMeta.producedPartitions();
             if (partitions != null) {
-                for (String partition : partitions) {
-                    if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
-                        LOG.info("endTransactionForTimeout txnId:{},timeout{},time:{}, topics:{}", txnID,
-                                txnMeta.getTimeoutAt(), txnMeta.getOpenTimestamp(),
-                                partitions);
-                    }
-                    break;
-                }
+                LOG.info("endTransactionForTimeout txnId:{},timeout{},time:{}, topics:{}", txnID,
+                        txnMeta.getTimeoutAt(), txnMeta.getOpenTimestamp(),
+                        partitions);
             }
 
             if (txnMeta.status() == TxnStatus.OPEN) {

@@ -2621,14 +2621,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                             + "from {} with txnId {}, topic: [{}]", requestId, remoteAddress, txnID, partition));
         }
 
-        if (partitionsList != null) {
-            for (String partition : partitionsList) {
-                if (partition.contains("wx_finder_live/dwd_21024/dwd_21024")) {
-                    log.info("handleAddPartitionToTxn txnID:{}, tp:{} size:{}", txnID, partition);
-                }
-                break;
-            }
-        }
+        log.info("handleAddPartitionToTxn txnID:{}", txnID);
 
         if (!checkTransactionEnableAndSendError(requestId)) {
             return;

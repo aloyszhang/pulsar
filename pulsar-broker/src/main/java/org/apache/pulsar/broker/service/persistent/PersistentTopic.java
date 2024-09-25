@@ -3372,10 +3372,12 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
             MessageMetadata md = Commands.parseMessageMetadata(entry.getDataBuffer());
             // If a messages has marker will filter by AbstractBaseDispatcher.filterEntriesForConsumer
             if (Markers.isServerOnlyMarker(md)) {
+                time.times1++;
                 return false;
             } else if (md.hasTxnidMostBits() && md.hasTxnidLeastBits()) {
                 // Filter-out transaction aborted messages.
                 TxnID txnID = new TxnID(md.getTxnidMostBits(), md.getTxnidLeastBits());
+                time.times2++;
                 return !isTxnAborted(txnID, (PositionImpl) entry.getPosition());
             }
             return true;

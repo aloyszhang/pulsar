@@ -30,6 +30,8 @@ public class GetLastMessageTime {
     public long time8;
     public long time31;
     public long times;
+    public int times1;
+    public int times2;
 
     @Override
     public String toString() {
@@ -45,6 +47,8 @@ public class GetLastMessageTime {
                 ", time8=" + time8 +
                 ", time31=" + time31 +
                 ", times=" + times +
+                ", times1=" + times1 +
+                ", times2=" + times2 +
                 '}';
     }
 }

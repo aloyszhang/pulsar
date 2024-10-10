@@ -28,11 +28,14 @@ import org.apache.pulsar.transaction.coordinator.TransactionMetadataStore;
 import org.apache.pulsar.transaction.coordinator.TransactionMetadataStoreProvider;
 import org.apache.pulsar.transaction.coordinator.TransactionRecoverTracker;
 import org.apache.pulsar.transaction.coordinator.TransactionTimeoutTracker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The provider that offers managed ledger implementation of {@link TransactionMetadataStore}.
  */
 public class MLTransactionMetadataStoreProvider implements TransactionMetadataStoreProvider {
+    private static final Logger LOG = LoggerFactory.getLogger(MLTransactionMetadataStoreProvider.class);
 
 
     private static volatile TxnLogBufferedWriterMetricsStats bufferedWriterMetrics =
@@ -73,7 +76,9 @@ public class MLTransactionMetadataStoreProvider implements TransactionMetadataSt
         managedLedgerConfig.setManagedLedgerInterceptor(mlTransactionSequenceIdGenerator);
         MLTransactionLogImpl txnLog = new MLTransactionLogImpl(transactionCoordinatorId,
                 managedLedgerFactory, managedLedgerConfig, txnLogBufferedWriterConfig, timer, bufferedWriterMetrics);
-
+        if (transactionCoordinatorId.getId() == 131) {
+            LOG.info("handleTcClientConnect tryAcquire tcId:{}", transactionCoordinatorId);
+        }
         // MLTransactionLogInterceptor will init sequenceId and update the sequenceId to managedLedger properties.
         return txnLog.initialize().thenCompose(__ ->
                 new MLTransactionMetadataStore(transactionCoordinatorId, txnLog, timeoutTracker,

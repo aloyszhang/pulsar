@@ -113,6 +113,9 @@ public class TransactionMetadataStoreService {
     }
 
     public CompletableFuture<Void> handleTcClientConnect(TransactionCoordinatorID tcId) {
+        if (tcId.getId() == 131) {
+            LOG.info("handleTcClientConnect tcId:{}", tcId);
+        }
         CompletableFuture<Void> completableFuture = new CompletableFuture<>();
         internalPinnedExecutor.execute(() -> {
             if (stores.get(tcId) != null) {
@@ -121,6 +124,10 @@ public class TransactionMetadataStoreService {
                 pulsarService.getBrokerService().checkTopicNsOwnership(SystemTopicNames
                         .TRANSACTION_COORDINATOR_ASSIGN.getPartition((int) tcId.getId()).toString())
                         .thenRun(() -> internalPinnedExecutor.execute(() -> {
+                    if (tcId.getId() == 131) {
+                       LOG.info("handleTcClientConnect checkTopicNsOwnership tcId:{}", tcId);
+                    }
+
                     final Semaphore tcLoadSemaphore = this.tcLoadSemaphores
                             .computeIfAbsent(tcId.getId(), (id) -> new Semaphore(1));
                     Deque<CompletableFuture<Void>> deque = pendingConnectRequests
@@ -128,6 +135,9 @@ public class TransactionMetadataStoreService {
                     if (tcLoadSemaphore.tryAcquire()) {
                         // when tcLoadSemaphore.release(), this command will acquire semaphore,
                         // so we should jude the store exist again.
+                        if (tcId.getId() == 131) {
+                            LOG.info("handleTcClientConnect tryAcquire tcId:{}", tcId);
+                        }
                         if (stores.get(tcId) != null) {
                             completableFuture.complete(null);
                             tcLoadSemaphore.release();
@@ -205,6 +215,7 @@ public class TransactionMetadataStoreService {
                         }
                     }
                 })).exceptionally(ex -> {
+                    LOG.error("checkTopicNsOwnership error tcId:{}", tcId);
                     Throwable realCause = FutureUtil.unwrapCompletionException(ex);
                     completableFuture.completeExceptionally(realCause);
                     return null;

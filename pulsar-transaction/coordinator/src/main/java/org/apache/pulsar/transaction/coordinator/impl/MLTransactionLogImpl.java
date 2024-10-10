@@ -247,6 +247,7 @@ public class MLTransactionLogImpl implements TransactionLog {
         }
 
         public void start() {
+            log.info("start tcId:{}", tcId);
             while (fillEntryQueueCallback.fillQueue() || entryQueue.size() > 0) {
                 Entry entry = entryQueue.poll();
                 if (entry != null) {
@@ -353,6 +354,7 @@ public class MLTransactionLogImpl implements TransactionLog {
                 }
             }, entries.size());
 
+            log.info("Transaction log readEntriesComplete tcId:{}-{}-{}", tcId, entryQueue.size(), entries.size());
             outstandingReadsRequests.decrementAndGet();
         }
 

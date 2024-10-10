@@ -18,6 +18,7 @@
  */
 package org.apache.bookkeeper.mledger.util;
 
+import com.google.common.cache.Cache;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
@@ -36,20 +37,27 @@ public class ManagedLedgerImplUtils {
      */
     public static CompletableFuture<Position> asyncGetLastValidPosition(final ManagedLedgerImpl ledger,
                                                                         final Predicate<Entry> predicate,
-                                                                        final PositionImpl startPosition) {
+                                                                        final PositionImpl startPosition,
+                                                                        Cache<Position, Position> txnMarkers) {
         CompletableFuture<Position> future = new CompletableFuture<>();
-        internalAsyncReverseFindPositionOneByOne(ledger, predicate, startPosition, future);
+        internalAsyncReverseFindPositionOneByOne(ledger, predicate, startPosition, future, txnMarkers);
         return future;
     }
 
     private static void internalAsyncReverseFindPositionOneByOne(final ManagedLedgerImpl ledger,
                                                                  final Predicate<Entry> predicate,
-                                                                 final PositionImpl position,
-                                                                 final CompletableFuture<Position> future) {
+                                                                 PositionImpl position,
+                                                                 final CompletableFuture<Position> future,
+                                                                 Cache<Position, Position> txnMarkers) {
         if (!ledger.isValidPosition(position)) {
             future.complete(position);
             return;
         }
+
+        while (txnMarkers.getIfPresent(position) != null) {
+            position = ledger.getPreviousPosition(position);
+        }
+
         ledger.asyncReadEntry(position, new AsyncCallbacks.ReadEntryCallback() {
             @Override
             public void readEntryComplete(Entry entry, Object ctx) {
@@ -60,7 +68,11 @@ public class ManagedLedgerImplUtils {
                         return;
                     }
                     PositionImpl previousPosition = ledger.getPreviousPosition((PositionImpl) position);
-                    internalAsyncReverseFindPositionOneByOne(ledger, predicate, previousPosition, future);
+                    while (txnMarkers.getIfPresent(previousPosition) != null) {
+                        previousPosition = ledger.getPreviousPosition(previousPosition);
+                    }
+
+                    internalAsyncReverseFindPositionOneByOne(ledger, predicate, previousPosition, future, txnMarkers);
                 } catch (Exception e) {
                     future.completeExceptionally(e);
                 } finally {

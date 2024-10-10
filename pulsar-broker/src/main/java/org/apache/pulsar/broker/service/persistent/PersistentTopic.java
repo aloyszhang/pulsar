@@ -26,6 +26,8 @@ import static org.apache.pulsar.common.protocol.Commands.DEFAULT_CONSUMER_EPOCH;
 import static org.apache.pulsar.compaction.Compactor.COMPACTION_SUBSCRIPTION;
 import com.carrotsearch.hppc.ObjectObjectHashMap;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.concurrent.FastThreadLocal;
@@ -3362,6 +3364,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
     public Position getLastPosition() {
         return ledger.getLastConfirmedEntry();
     }
+    public Cache<Position, Position> txnMarkers = CacheBuilder.newBuilder().maximumSize(2000).build();
 
     @Override
     public CompletableFuture<Position> getLastDispatchablePosition() {
@@ -3381,7 +3384,7 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 return !isTxnAborted(txnID, (PositionImpl) entry.getPosition());
             }
             return true;
-        }, getMaxReadPosition());
+        }, getMaxReadPosition(), txnMarkers);
     }
 
     @Override

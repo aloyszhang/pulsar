@@ -2235,7 +2235,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                 long cost = time.time8 - time.startTime;
                 log.info("handleGetLastMessageId success cost:{} {}", cost, time.times);
                 if (cost > 1000) {
-                    log.info("handleGetLastMessageId success cost:{} gt 1000 {}", cost, time);
+                    log.info("handleGetLastMessageId success cost:{} gt 1000 {}-{}", cost, time, persistentTopic.topic);
                 }
             }
         });

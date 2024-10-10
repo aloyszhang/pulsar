@@ -315,6 +315,7 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
                     @Override
                     public void addComplete(Position position, ByteBuf entryData, Object ctx) {
                         synchronized (TopicTransactionBuffer.this) {
+                            topic.txnMarkers.put(position, position);
                             removeTxnAndUpdateMaxReadPosition(txnID);
                             handleLowWaterMark(txnID, lowWaterMark);
                             snapshotAbortedTxnProcessor.trimExpiredAbortedTxns();
@@ -361,6 +362,7 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
                     @Override
                     public void addComplete(Position position, ByteBuf entryData, Object ctx) {
                         synchronized (TopicTransactionBuffer.this) {
+                            topic.txnMarkers.put(position, position);
                             snapshotAbortedTxnProcessor.putAbortedTxnAndPosition(txnID, (PositionImpl) position);
                             removeTxnAndUpdateMaxReadPosition(txnID);
                             snapshotAbortedTxnProcessor.trimExpiredAbortedTxns();

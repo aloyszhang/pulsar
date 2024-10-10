@@ -73,6 +73,7 @@ public class MLTransactionMetadataStoreProvider implements TransactionMetadataSt
         managedLedgerConfig.setManagedLedgerInterceptor(mlTransactionSequenceIdGenerator);
         MLTransactionLogImpl txnLog = new MLTransactionLogImpl(transactionCoordinatorId,
                 managedLedgerFactory, managedLedgerConfig, txnLogBufferedWriterConfig, timer, bufferedWriterMetrics);
+        
         // MLTransactionLogInterceptor will init sequenceId and update the sequenceId to managedLedger properties.
         return txnLog.initialize().thenCompose(__ ->
                 new MLTransactionMetadataStore(transactionCoordinatorId, txnLog, timeoutTracker,

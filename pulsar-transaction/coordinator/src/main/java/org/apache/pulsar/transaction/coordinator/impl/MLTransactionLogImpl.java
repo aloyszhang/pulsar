@@ -333,11 +333,14 @@ public class MLTransactionLogImpl implements TransactionLog {
                 if (cursor.hasMoreEntries()) {
                     outstandingReadsRequests.incrementAndGet();
                     readAsync(NUMBER_OF_PER_READ_ENTRY, this);
+                    log.info("fillQueue result:{}", isReadable);
                     return isReadable;
                 } else {
+                    log.info("fillQueue hasNoMoreEntries result:{}", false);
                     return false;
                 }
             } else {
+                log.info("capacity full result:{}", false);
                 return isReadable;
             }
         }

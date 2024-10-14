@@ -550,6 +550,9 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
 
     @Override
     public void publishMessage(ByteBuf headersAndPayload, PublishContext publishContext) {
+
+        lastPublishMessageTime = System.currentTimeMillis();
+
         pendingWriteOps.incrementAndGet();
         if (isFenced) {
             publishContext.completed(new TopicFencedException("fenced"), -1, -1);
@@ -3366,25 +3369,42 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
     }
     public Cache<Position, Position> txnMarkers = CacheBuilder.newBuilder().maximumSize(2000).build();
 
+    public volatile CompletableFuture<Position> lastPosition = null;
+
+    public volatile long lastRefreshPositionTime;
+
+    public volatile long lastPublishMessageTime;
+
     @Override
     public CompletableFuture<Position> getLastDispatchablePosition() {
+
+        if (lastRefreshPositionTime > lastPublishMessageTime && lastPosition != null) {
+            return lastPosition;
+        }
+
         GetLastMessageTime time = ServerCnx.timeTL.get();
         time.time31 = System.currentTimeMillis();
-        return ManagedLedgerImplUtils.asyncGetLastValidPosition((ManagedLedgerImpl) ledger, entry -> {
-            time.times++;
-            MessageMetadata md = Commands.parseMessageMetadata(entry.getDataBuffer());
-            // If a messages has marker will filter by AbstractBaseDispatcher.filterEntriesForConsumer
-            if (Markers.isServerOnlyMarker(md)) {
-                time.times1++;
-                return false;
-            } else if (md.hasTxnidMostBits() && md.hasTxnidLeastBits()) {
-                // Filter-out transaction aborted messages.
-                TxnID txnID = new TxnID(md.getTxnidMostBits(), md.getTxnidLeastBits());
-                time.times2++;
-                return !isTxnAborted(txnID, (PositionImpl) entry.getPosition());
-            }
-            return true;
-        }, getMaxReadPosition(), txnMarkers);
+        CompletableFuture<Position> positionCompletableFuture =
+                ManagedLedgerImplUtils.asyncGetLastValidPosition((ManagedLedgerImpl) ledger, entry -> {
+                    time.times++;
+                    MessageMetadata md = Commands.parseMessageMetadata(entry.getDataBuffer());
+                    // If a messages has marker will filter by AbstractBaseDispatcher.filterEntriesForConsumer
+                    if (Markers.isServerOnlyMarker(md)) {
+                        time.times1++;
+                        return false;
+                    } else if (md.hasTxnidMostBits() && md.hasTxnidLeastBits()) {
+                        // Filter-out transaction aborted messages.
+                        TxnID txnID = new TxnID(md.getTxnidMostBits(), md.getTxnidLeastBits());
+                        time.times2++;
+                        return !isTxnAborted(txnID, (PositionImpl) entry.getPosition());
+                    }
+                    return true;
+                }, getMaxReadPosition(), txnMarkers);
+
+        lastPosition = positionCompletableFuture;
+        lastRefreshPositionTime = System.currentTimeMillis();
+
+        return positionCompletableFuture;
     }
 
     @Override
@@ -3682,6 +3702,8 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
 
     @Override
     public void publishTxnMessage(TxnID txnID, ByteBuf headersAndPayload, PublishContext publishContext) {
+        lastPublishMessageTime = System.currentTimeMillis();
+
         pendingWriteOps.incrementAndGet();
         // in order to avoid the opAddEntry retain
 

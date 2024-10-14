@@ -84,6 +84,8 @@ public class MLTransactionLogImpl implements TransactionLog {
 
     private final TxnLogBufferedWriterMetricsStats bufferedWriterMetrics;
 
+    private static final int INIT_TC_TIMEOUT = 5 * 60 * 1000;
+
     public MLTransactionLogImpl(TransactionCoordinatorID tcID,
                                 ManagedLedgerFactory managedLedgerFactory,
                                 ManagedLedgerConfig managedLedgerConfig,
@@ -247,10 +249,20 @@ public class MLTransactionLogImpl implements TransactionLog {
         }
 
         public void start() {
+            long startTime = System.currentTimeMillis();
+            int readEntryCount = 0;
+            log.info("MLTransactionLogImpl init start tcId:{}", tcId);
             while (fillEntryQueueCallback.fillQueue() || entryQueue.size() > 0) {
+
+                if (System.currentTimeMillis() - startTime > INIT_TC_TIMEOUT) {
+                    log.info("MLTransactionLogImpl init timeout tcId:{}", tcId);
+                    break;
+                }
+
                 Entry entry = entryQueue.poll();
                 if (entry != null) {
                     try {
+                        readEntryCount++;
                         List<TransactionMetadataEntry> logs = deserializeEntry(entry);
                         if (logs.isEmpty()){
                             continue;
@@ -294,6 +306,8 @@ public class MLTransactionLogImpl implements TransactionLog {
                     }
                 }
             }
+            log.info("replayComplete tcId:{}, cost:{}, readEntryCount:{}", tcId, System.currentTimeMillis() - startTime,
+                    readEntryCount);
             transactionLogReplayCallback.replayComplete();
         }
     }

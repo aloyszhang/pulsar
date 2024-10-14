@@ -24,7 +24,7 @@ public class PulsarConsumerNormalTest {
                     .serviceUrl("pulsar://localhost:6650").connectionsPerBroker(10).ioThreads(10).listenerThreads(100)
                     .build();
 
-            String topic = "perf_test/perf_test/last_message_test-partition-0";
+            String topic = "persistent://compaction/compaction/compaction_test-partition-0";
 
             Consumer<byte[]> consumer = client.newConsumer().topic(topic)
                     .subscriptionType(SubscriptionType.Exclusive)
@@ -49,21 +49,16 @@ public class PulsarConsumerNormalTest {
 
             ConsumerImpl consumer1 = (ConsumerImpl) consumer;
 
-            Object a = consumer1.internalGetLastMessageIdAsync().get();
 
-            Field lastMessageId = a.getClass().getDeclaredField("lastMessageId");
-            lastMessageId.setAccessible(true);
-            MessageId messageId = (MessageId)lastMessageId.get(a);
-            System.out.println(messageId);
-
-
-            System.out.println(a);
-
-
-
-
-            Thread.sleep(3000);
-            System.out.println(client);
+            for (int i = 0; i < 1000; i++) {
+                long start = System.currentTimeMillis();
+                Object a = consumer1.internalGetLastMessageIdAsync().get();
+                Field lastMessageId = a.getClass().getDeclaredField("lastMessageId");
+                lastMessageId.setAccessible(true);
+                MessageId messageId = (MessageId) lastMessageId.get(a);
+                System.out.println(messageId + " cost: " + (System.currentTimeMillis() - start));
+                Thread.sleep(1000);
+            }
         } catch (Throwable e) {
             e.printStackTrace();
             throw new RuntimeException(e);

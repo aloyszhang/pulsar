@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.transaction.Transaction;
 
 public class PulsarProducerNormalTest {
 
@@ -28,9 +29,11 @@ public class PulsarProducerNormalTest {
                     .topic(topic)
                     .create();
 
+            Transaction txn = client.newTransaction().build().get();
+
             System.out.println("start");
 
-            for (int i = 0; i < 2000; i++) {
+            for (int i = 0; i < 200000000; i++) {
                 try {
 
                     String key = "C";
@@ -40,7 +43,7 @@ public class PulsarProducerNormalTest {
 
                     String message = "My message" + i + " | " + System.currentTimeMillis();
                     long start = System.currentTimeMillis();
-                    MessageId send = producer.newMessage().key(key).value(message.getBytes()).send();
+                    MessageId send = producer.newMessage(txn).key(key).value(message.getBytes()).send();
                     long end = System.currentTimeMillis();
                     System.err.println(
                             (end - start) + " --send ok" + key + " | " + send + "|" + producer.getLastDisconnectedTimestamp()
@@ -48,7 +51,14 @@ public class PulsarProducerNormalTest {
                                     + "|" + producer.getTopic()
                                     + "|" + producer.getStats() + "--" + message);
 
-                    Thread.sleep(1);
+                    Thread.sleep(1000);
+
+                    if (i % 10 == 0) {
+                        txn.commit();
+                        System.err.println("commit -----------------");
+                        txn = client.newTransaction().build().get();
+                    }
+
                 } catch (Throwable throwable) {
                     throwable.printStackTrace();
                 }

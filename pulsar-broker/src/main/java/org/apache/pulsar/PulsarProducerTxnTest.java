@@ -55,7 +55,7 @@ public class PulsarProducerTxnTest {
                                             + "|" + producer.getTopic()
                                             + "|" + producer.getStats() + "--" + message);
 
-                            txn.commit();
+                            //txn.commit();
                         } catch (Throwable throwable) {
                             throwable.printStackTrace();
                         }

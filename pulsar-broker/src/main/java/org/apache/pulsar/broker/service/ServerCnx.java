@@ -2184,8 +2184,8 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         ml.asyncReadEntry(lastPosition, new AsyncCallbacks.ReadEntryCallback() {
             @Override
             public void readEntryComplete(Entry entry, Object ctx) {
-                entryFuture.complete(entry);
                 time.time7 = System.currentTimeMillis();
+                entryFuture.complete(entry);
             }
 
             @Override
@@ -2195,9 +2195,11 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         }, null);
 
         CompletableFuture<Integer> batchSizeFuture = entryFuture.thenApply(entry -> {
+            time.time71 = System.currentTimeMillis();
             MessageMetadata metadata = Commands.parseMessageMetadata(entry.getDataBuffer());
             int batchSize = metadata.getNumMessagesInBatch();
             entry.release();
+            time.time72 = System.currentTimeMillis();
             return metadata.hasNumMessagesInBatch() ? batchSize : -1;
         });
 
@@ -2226,13 +2228,13 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                     log.debug("[{}] [{}][{}] Get LastMessageId {} partitionIndex {}", ServerCnx.this.toString(),
                             topic.getName(), subscriptionName, lastPosition, partitionIndex);
                 }
-
+                time.time8 = System.currentTimeMillis();
                 writeAndFlush(Commands.newGetLastMessageIdResponse(requestId, lastPosition.getLedgerId(),
                         lastPosition.getEntryId(), partitionIndex, largestBatchIndex,
                         markDeletePosition != null ? markDeletePosition.getLedgerId() : -1,
                         markDeletePosition != null ? markDeletePosition.getEntryId() : -1));
-                time.time8 = System.currentTimeMillis();
-                long cost = time.time8 - time.startTime;
+                time.time9 = System.currentTimeMillis();
+                long cost = time.time9 - time.startTime;
                 log.info("handleGetLastMessageId success cost:{} {}", cost, time.times);
                 if (cost > 1000) {
                     log.info("handleGetLastMessageId success cost:{} gt 1000 {}-{}", cost, time, persistentTopic.topic);

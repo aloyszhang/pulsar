@@ -288,6 +288,11 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
         if (!ongoingTxns.containsKey(txnId) && !this.snapshotAbortedTxnProcessor
                 .checkAbortedTransaction(txnId)) {
             ongoingTxns.put(txnId, (PositionImpl) position);
+
+            if (topic.getName().contains("dwd_21241/dwd_21241")) {
+                log.info("handleTransactionMessage txnId:{}, position:{}", txnId, position);
+            }
+
             PositionImpl firstPosition = ongoingTxns.get(ongoingTxns.firstKey());
             // max read position is less than first ongoing transaction message position
             updateMaxReadPosition(((ManagedLedgerImpl) topic.getManagedLedger()).getPreviousPosition(firstPosition),

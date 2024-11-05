@@ -23,7 +23,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -76,6 +78,11 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
      */
     private final LinkedMap<TxnID, PositionImpl> ongoingTxns = new LinkedMap<>();
 
+    /**
+     * Recover Ongoing transaction, Prevents long periods of unavailability, Need to be manually cleared.
+     */
+    private final Set<TxnID> recoverOngoingTxns = new HashSet<>();
+
     // when change max read position, the count will +1. Take snapshot will reset the count.
     private final AtomicLong changeMaxReadPositionCount = new AtomicLong();
 
@@ -121,6 +128,8 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
         this.recover();
     }
 
+    private static final int ONGOING_TXNS_TIMEOUT = 5 * 60 * 1000;
+
     private void recover() {
         log.info("[{}]Transaction buffer recover start, current state: {}", topic.getName(), getState());
 
@@ -132,6 +141,19 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
                         synchronized (TopicTransactionBuffer.this) {
                             if (ongoingTxns.isEmpty()) {
                                 maxReadPosition = (PositionImpl) topic.getManagedLedger().getLastConfirmedEntry();
+                            }else {
+                                timer.newTimeout((TimerTask) timeout -> {
+                                    log.info("[{}] remove recoverOngoingTxns because of timeout start",
+                                            topic.getName());
+                                    int count = 0;
+                                    for (TxnID recoverOngoingTxn : recoverOngoingTxns) {
+                                        removeTxnAndUpdateMaxReadPosition(recoverOngoingTxn);
+                                        count++;
+                                    }
+                                    log.info("[{}] remove recoverOngoingTxns because of timeout end count:{}",
+                                            topic.getName(), count);
+
+                                }, ONGOING_TXNS_TIMEOUT, TimeUnit.MILLISECONDS);
                             }
                             if (!changeToReadyState()) {
                                 log.error("[{}]Transaction buffer recover fail, current state: {}",
@@ -178,6 +200,7 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
                                     removeTxnAndUpdateMaxReadPosition(txnID);
                                 } else {
                                     handleTransactionMessage(txnID, position);
+                                    recoverOngoingTxns.add(txnID);
                                 }
                             }
                         }
@@ -287,12 +310,6 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
     private void handleTransactionMessage(TxnID txnId, Position position) {
         if (!ongoingTxns.containsKey(txnId) && !this.snapshotAbortedTxnProcessor
                 .checkAbortedTransaction(txnId)) {
-
-            if (topic.getName().contains("dwd_21241/dwd_21241")) {
-                log.info("handleTransactionMessage txnId:{}, position:{}", txnId, position);
-                return;
-            }
-
             ongoingTxns.put(txnId, (PositionImpl) position);
             PositionImpl firstPosition = ongoingTxns.get(ongoingTxns.firstKey());
             // max read position is less than first ongoing transaction message position

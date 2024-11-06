@@ -474,14 +474,15 @@ public class InLongMetricsManager {
 
     public static void addTopicName(TopicName topicName, StringBuilder stringBuilder, String delimiter) {
         if (topicName.isPartitioned()) {
+            String[] topicElements = topicName.getPartitionedTopicName().split("/");
             stringBuilder
-                    .append(topicName.getPartitionedTopicName()).append(delimiter)
-                    .append(topicName.getPartitionIndex()).append(delimiter);
+                    .append(topicElements[topicElements.length - 1]).append(delimiter)
+                    .append(topicName.getPartitionIndex());
         } else {
             stringBuilder
-                    .append(topicName.getLocalName()).append(delimiter)
-                    .append(delimiter);
+                    .append(topicName.getLocalName()).append(delimiter);
         }
+        stringBuilder.append(delimiter);
     }
 
     private static String getLocalFileMetric(String key, MetricEntity metricEntity) {

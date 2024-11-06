@@ -458,6 +458,7 @@ public class InLongMetricsInterceptor implements BrokerInterceptor {
                 : localTopicName.length();
         localTopicName = localTopicName.substring(0, endIndex);
         return localTopicName.equalsIgnoreCase("__transaction_buffer_snapshot")
-                || localTopicName.equalsIgnoreCase("healthcheck");
+                || localTopicName.equalsIgnoreCase("healthcheck")
+                || localTopicName.equalsIgnoreCase("__change_events");
     }
 }

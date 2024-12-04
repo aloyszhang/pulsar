@@ -62,7 +62,6 @@ import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
 import org.apache.pulsar.common.policies.data.BacklogQuota;
 import org.apache.pulsar.common.policies.data.DelayedDeliveryPolicies;
 import org.apache.pulsar.common.policies.data.DispatchRate;
@@ -566,59 +565,30 @@ public class CmdTopics extends CmdBase {
         @Override
         void run() throws Exception {
 
-            List<String> partitionedTopicList =
-                    getTopics().getPartitionedTopicList("public/default");
+            List<String> namespaces =
+                    getAdmin().namespaces().getNamespaces("wx_finder_live");
 
-            System.out.println("topics Size:" + partitionedTopicList.size());
+            System.out.println("namespaces Size:" + namespaces.size());
 
             int count = 0;
-            for (String s : partitionedTopicList) {
-                PartitionedTopicMetadata partitionedTopicMetadata = getAdmin().topics().getPartitionedTopicMetadata(s);
-                int partitions = partitionedTopicMetadata.partitions;
-                System.out.println(" topic info " + s + " partitionNum:" + partitions);
-
-                //persistent://wx_finder_live/putin_23208/putin_23208
-                String localName = TopicName.get(s).getLocalName();
-                String newTopicName = "persistent://wx_finder_live/" + localName + "/" + localName;
-
-                try {
-                    String namespace = "wx_finder_live/" + localName;
-                    getAdmin().namespaces().createNamespace(namespace, 150);
-                    getAdmin().namespaces().setPersistence(namespace, new PersistencePolicies(2, 2, 2, 0.01));
-                    getAdmin().namespaces().setRetention(namespace, new RetentionPolicies(1440 * 2, -1));
-                    getAdmin().namespaces().setNamespaceMessageTTL(namespace, 86400 * 2);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                try {
-                    getTopics().createPartitionedTopic(newTopicName, partitions);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                System.out.println(" new topic info " + s + " partitionNum:" + partitions);
-
-                List<String> subscriptions = getTopics().getSubscriptions(s);
-
-                System.out.println("sub size " + subscriptions.size());
-                int createdSubCount = 0;
-                for (String subscription : subscriptions) {
-                    System.out.println(s + " topic create start + subscription info " + subscription);
-
-                    try {
-                        getTopics().createSubscription(newTopicName, subscription, MessageId.latest);
-                    } catch (Exception e) {
-                        e.printStackTrace();
+            for (String namespace : namespaces) {
+                System.out.println("sh pulsar-admin namespaces create -b 150 " + namespace);
+                System.out.println("sh pulsar-admin namespaces set-persistence -a 2 -e 2 -w 2 -r 0.01 " + namespace);
+                System.out.println("sh pulsar-admin namespaces set-retention -t 2d -s -1 " + namespace);
+                System.out.println("sh pulsar-admin namespaces set-message-ttl -ttl 2d " + namespace);
+                List<String> partitionedTopicMetadata = getAdmin().topics().getPartitionedTopicList(namespace);
+                for (String topic : partitionedTopicMetadata) {
+                    int partitions = getAdmin().topics().getPartitionedTopicMetadata(topic).partitions;
+                    System.out.println("sh pulsar-admin topics create-partitioned-topic -p " + partitions + " " + topic);
+                    List<String> subscriptions = getAdmin().topics().getSubscriptions(topic);
+                    for (String subscription : subscriptions) {
+                        if (subscription.contains("reader")) {
+                            continue;
+                        }
+                        System.out.println("sh pulsar-admin topics create-subscription -s " + subscription + " " + topic);
                     }
-
-                    System.out.println(s + " topic create end + subscription info " + subscription);
-                    createdSubCount++;
                 }
-                System.out.println("sub created size " + createdSubCount);
-
                 count++;
-
             }
             System.out.println("process topics Size:" + count);
         }

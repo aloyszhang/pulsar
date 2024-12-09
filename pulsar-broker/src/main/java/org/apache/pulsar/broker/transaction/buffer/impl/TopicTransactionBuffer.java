@@ -586,6 +586,11 @@ public class TopicTransactionBuffer extends TopicTransactionBufferState implemen
     }
 
     @Override
+    public List<TxnID> getTxnList() {
+        return ongoingTxns.asList();
+    }
+
+    @Override
     public void run(Timeout timeout) {
         if (checkIfReady()) {
             synchronized (TopicTransactionBuffer.this) {

@@ -164,6 +164,14 @@ public interface Transactions {
     TransactionBufferStats getTransactionBufferStats(String topic, boolean lowWaterMarks) throws PulsarAdminException;
 
     /**
+     * Get transaction buffer txn list.
+     *
+     * @param topic the topic of getting transaction buffer stats
+     * @return the txn list of transaction buffer in topic.
+     */
+    TransactionBufferStats getTransactionBufferTxnList(String topic) throws PulsarAdminException;
+
+    /**
      * Get transaction buffer stats.
      *
      * @param topic the topic of getting transaction buffer stats

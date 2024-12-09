@@ -68,6 +68,17 @@ public class CmdTransactions extends CmdBase {
         }
     }
 
+    @Parameters(commandDescription = "Get transaction buffer txn list")
+    private class GetTransactionBufferTxnList extends CliCommand {
+        @Parameter(names = {"-t", "--topic"}, description = "The topic", required = true)
+        private String topic;
+
+        @Override
+        void run() throws Exception {
+            print(getAdmin().transactions().getTransactionBufferTxnList(topic));
+        }
+    }
+
     @Parameters(commandDescription = "Get transaction pending ack stats")
     private class GetPendingAckStats extends CliCommand {
         @Parameter(names = {"-t", "--topic"}, description = "The topic name", required = true)
@@ -282,6 +293,7 @@ public class CmdTransactions extends CmdBase {
         jcommander.addCommand("pending-ack-internal-stats", new GetPendingAckInternalStats());
         jcommander.addCommand("coordinator-stats", new GetCoordinatorStats());
         jcommander.addCommand("transaction-buffer-stats", new GetTransactionBufferStats());
+        jcommander.addCommand("transaction-buffer-txn-list", new GetTransactionBufferTxnList());
         jcommander.addCommand("pending-ack-stats", new GetPendingAckStats());
         jcommander.addCommand("transaction-in-buffer-stats", new GetTransactionInBufferStats());
         jcommander.addCommand("transaction-in-pending-ack-stats", new GetTransactionInPendingAckStats());

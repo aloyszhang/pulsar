@@ -186,4 +186,8 @@ public interface TransactionBuffer {
     long getAbortedTxnCount();
 
     long getCommittedTxnCount();
+
+    default List<TxnID> getTxnList() {
+        return null;
+    }
 }

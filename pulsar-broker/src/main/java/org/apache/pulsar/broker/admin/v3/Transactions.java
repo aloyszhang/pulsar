@@ -191,6 +191,40 @@ public class Transactions extends TransactionsBase {
     }
 
     @GET
+    @Path("/transactionBufferList/{tenant}/{namespace}/{topic}")
+    @ApiOperation(value = "Get transaction buffer txn list in topic.")
+    @ApiResponses(value = {@ApiResponse(code = 403, message = "Don't have admin permission"),
+            @ApiResponse(code = 404, message = "Tenant or cluster or namespace or topic doesn't exist"),
+            @ApiResponse(code = 503, message = "This Broker is not configured "
+                    + "with transactionCoordinatorEnabled=true."),
+            @ApiResponse(code = 307, message = "Topic is not owned by this broker!"),
+            @ApiResponse(code = 400, message = "Topic is not a persistent topic!"),
+            @ApiResponse(code = 409, message = "Concurrent modification")})
+    public void getTransactionBufferTxnList(@Suspended final AsyncResponse asyncResponse,
+                                            @QueryParam("authoritative")
+                                            @DefaultValue("false") boolean authoritative,
+                                            @PathParam("tenant") String tenant,
+                                            @PathParam("namespace") String namespace,
+                                            @PathParam("topic") @Encoded String encodedTopic) {
+        try {
+            checkTransactionCoordinatorEnabled();
+            validateTopicName(tenant, namespace, encodedTopic);
+            internalGetTransactionBufferTxnList(authoritative)
+                    .thenAccept(asyncResponse::resume)
+                    .exceptionally(ex -> {
+                        if (isNot307And404Exception(ex)) {
+                            log.error("[{}] Failed to get transaction buffer txn list in topic {}",
+                                    clientAppId(), topicName, ex);
+                        }
+                        resumeAsyncResponseExceptionally(asyncResponse, ex);
+                        return null;
+                    });
+        } catch (Exception ex) {
+            resumeAsyncResponseExceptionally(asyncResponse, ex);
+        }
+    }
+
+    @GET
     @Path("/pendingAckStats/{tenant}/{namespace}/{topic}/{subName}")
     @ApiOperation(value = "Get transaction pending ack stats in topic.")
     @ApiResponses(value = {@ApiResponse(code = 403, message = "Don't have admin permission"),

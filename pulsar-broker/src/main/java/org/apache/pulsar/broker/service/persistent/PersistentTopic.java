@@ -3868,6 +3868,10 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
         return this.transactionBuffer.getStats(lowWaterMarks);
     }
 
+    public List<TxnID> getTransactionBufferTxnList() {
+        return this.transactionBuffer.getTxnList();
+    }
+
     public TransactionPendingAckStats getTransactionPendingAckStats(String subName, boolean lowWaterMarks) {
         return this.subscriptions.get(subName).getTransactionPendingAckStats(lowWaterMarks);
     }

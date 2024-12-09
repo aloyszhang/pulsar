@@ -146,11 +146,11 @@ public class TransactionsImpl extends BaseResource implements Transactions {
     }
 
     @Override
-    public TransactionBufferStats getTransactionBufferTxnList(String topic) throws PulsarAdminException {
+    public List<TxnID> getTransactionBufferTxnList(String topic) throws PulsarAdminException {
         return sync(() -> {
             WebTarget path = adminV3Transactions.path("transactionBufferTxnList");
             path = path.path(TopicName.get(topic).getRestPath(false));
-            return asyncGetRequest(path, new FutureCallback<TransactionBufferStats>(){});
+            return asyncGetRequest(path, new FutureCallback<List<TxnID>>(){});
         });
     }
 

@@ -191,7 +191,7 @@ public class Transactions extends TransactionsBase {
     }
 
     @GET
-    @Path("/transactionBufferList/{tenant}/{namespace}/{topic}")
+    @Path("/transactionBufferTxnList/{tenant}/{namespace}/{topic}")
     @ApiOperation(value = "Get transaction buffer txn list in topic.")
     @ApiResponses(value = {@ApiResponse(code = 403, message = "Don't have admin permission"),
             @ApiResponse(code = 404, message = "Tenant or cluster or namespace or topic doesn't exist"),

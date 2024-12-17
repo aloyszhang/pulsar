@@ -19,11 +19,16 @@
 package org.apache.pulsar.admin.cli;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.pulsar.common.policies.data.Policies.FIRST_BOUNDARY;
+import static org.apache.pulsar.common.policies.data.Policies.LAST_BOUNDARY;
+
 import com.beust.jcommander.IUsageFormatter;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.Parameters;
 import com.google.common.collect.Lists;
+import com.google.common.hash.HashFunction;
+import com.google.common.hash.Hashing;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -31,6 +36,7 @@ import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -62,7 +68,9 @@ import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
 import org.apache.pulsar.common.policies.data.BacklogQuota;
+import org.apache.pulsar.common.policies.data.BundlesData;
 import org.apache.pulsar.common.policies.data.DelayedDeliveryPolicies;
 import org.apache.pulsar.common.policies.data.DispatchRate;
 import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
@@ -266,6 +274,7 @@ public class CmdTopics extends CmdBase {
 
         jcommander.addCommand("trim-topic", new TrimTopic());
         jcommander.addCommand("copy-topic", new CopyTopic());
+        jcommander.addCommand("get-topic-bundle-distribution", new GetTopicBundleDistribution());
 
         initDeprecatedCommands();
     }
@@ -3208,6 +3217,63 @@ public class CmdTopics extends CmdBase {
         void run() throws PulsarAdminException {
             String topic = validateTopicName(params);
             getAdmin().topics().trimTopic(topic);
+        }
+    }
+
+    @Parameters(commandDescription = "Get the bundle distributions of a topic")
+    private class GetTopicBundleDistribution extends CliCommand {
+        @Parameter(description = "persistent://tenant/namespace/topic", required = true)
+        private java.util.List<String> params;
+
+        @Override
+        void run() throws PulsarAdminException {
+            String topic = validateTopicName(params);
+            String namespace = getNamespaceName(params);
+            PartitionedTopicMetadata topicMetadata = getAdmin().topics().getPartitionedTopicMetadata(topic);
+            BundlesData bundles = getAdmin().namespaces().getBundles(namespace);
+            print(getBundleDistribution(topic, topicMetadata.partitions, bundles));
+        }
+    }
+
+
+    private Map<String, List<String>> getBundleDistribution( String topic, int partition, BundlesData bundlesData) {
+        HashFunction hashFunc = Hashing.crc32();
+        Map<String, List<String>> bundleDistribution = new HashMap<>();
+        long[] partitions = getPartitions(bundlesData);
+        if (partition == 0) {
+            long hashCode = hashFunc.hashString(topic, StandardCharsets.UTF_8).padToLong();
+            String bundle = getBundleRange(hashCode, partitions);
+            bundleDistribution.computeIfAbsent(bundle, k -> new ArrayList<>()).add(topic);
+        } else {
+            for (int i = 0; i < partition; i++) {
+                String partitionName = topic + "-partition-" + i;
+                long hashCode = hashFunc.hashString(partitionName, StandardCharsets.UTF_8).padToLong();
+                String bundle = getBundleRange(hashCode, partitions);
+                bundleDistribution.computeIfAbsent(bundle, k -> new ArrayList<>()).add(partitionName);
+            }
+        }
+        return bundleDistribution;
+    }
+
+    private String getBundleRange(long hashCode, long[] partitions) {
+        int idx = Arrays.binarySearch(partitions, hashCode);
+        int lowerIdx = idx < 0 ? -(idx + 2) : idx;
+        System.out.println("lowerIdx: " + lowerIdx + "\n hashCode: " + hashCode + " \n partitions: " + Arrays.toString(partitions));
+        return String.format("0x%s_0x%s", Long.toHexString(partitions[lowerIdx]), Long.toHexString(partitions[lowerIdx + 1]));
+    }
+
+
+    static long[] getPartitions(BundlesData bundlesData) {
+        if (bundlesData == null) {
+            return new long[]{Long.decode(FIRST_BOUNDARY), Long.decode(LAST_BOUNDARY)};
+        } else {
+            List<String> boundaries = bundlesData.getBoundaries();
+            long[] partitions = new long[boundaries.size()];
+            for (int i = 0; i < boundaries.size(); i++) {
+                partitions[i] = Long.decode(boundaries.get(i));
+            }
+
+            return partitions;
         }
     }
 }

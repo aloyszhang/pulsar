@@ -2689,6 +2689,13 @@ public class ServiceConfiguration implements PulsarConfiguration {
     )
     private boolean loadBalancerSheddingBundlesWithPoliciesEnabled = false;
 
+    @FieldContext(
+            dynamic = true,
+            category = CATEGORY_LOAD_BALANCER,
+            doc = "The namespaces to be excluded from load shedding"
+    )
+    private Set<String> loadBalancerSheddingExcludedNamespaces = new HashSet<>();
+
     /**** --- Replication. --- ****/
     @FieldContext(
         category = CATEGORY_REPLICATION,

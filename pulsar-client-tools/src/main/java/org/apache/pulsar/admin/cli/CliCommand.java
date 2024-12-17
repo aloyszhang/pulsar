@@ -60,6 +60,11 @@ public abstract class CliCommand {
         return TopicName.get(topic).toString();
     }
 
+    static String getNamespaceName(List<String> params) {
+        String topic = checkArgument(params);
+        return TopicName.get(topic).getNamespace();
+    }
+
     static String validatePersistentTopic(List<String> params) {
         String topic = checkArgument(params);
         TopicName topicName = TopicName.get(topic);
